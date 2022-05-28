@@ -13,14 +13,14 @@ use std::{env, panic::set_hook, sync::Arc};
 use backtrace::Backtrace;
 use swc::Compiler;
 use swc_common::{self, sync::Lazy, FilePathMapping, SourceMap};
-use swc_reanimated_worklets_visitor::ReanimatedWorkletsVisitor;
+use swc_reanimated_worklets_visitor::create_worklets_visitor;
 
 use std::path::Path;
 
 use napi::bindgen_prelude::Buffer;
 use swc::{config::Options, TransformOutput};
 use swc_common::FileName;
-use swc_ecmascript::{transforms::pass::noop, visit::as_folder};
+use swc_ecmascript::transforms::pass::noop;
 
 use crate::util::{get_deserialized, try_with, MapErr};
 
@@ -89,7 +89,7 @@ pub fn transform_sync(s: String, _is_module: bool, opts: Buffer) -> napi::Result
                     None,
                     handler,
                     &options,
-                    |_program, _comments| as_folder(ReanimatedWorkletsVisitor),
+                    |_program, _comments| create_worklets_visitor(),
                     |_, _| noop(),
                 )
             })
