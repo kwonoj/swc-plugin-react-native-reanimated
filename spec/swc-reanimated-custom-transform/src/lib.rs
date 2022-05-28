@@ -13,7 +13,7 @@ use std::{env, panic::set_hook, sync::Arc};
 use backtrace::Backtrace;
 use swc::Compiler;
 use swc_common::{self, sync::Lazy, FilePathMapping, SourceMap};
-use swc_reanimated_worklets_visitor::ReanimatedWorkletsVisitor;
+use swc_reanimated_worklets_visitor::create_worklets_visitor;
 
 use std::path::Path;
 
@@ -89,7 +89,7 @@ pub fn transform_sync(s: String, _is_module: bool, opts: Buffer) -> napi::Result
                     None,
                     handler,
                     &options,
-                    |_program, _comments| as_folder(ReanimatedWorkletsVisitor),
+                    |_program, _comments| as_folder(create_worklets_visitor(None)),
                     |_, _| noop(),
                 )
             })
