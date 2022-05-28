@@ -89,7 +89,7 @@ pub fn transform_sync(s: String, _is_module: bool, opts: Buffer) -> napi::Result
                     None,
                     handler,
                     &options,
-                    |_program, _comments| as_folder(create_worklets_visitor()),
+                    |_program, _comments| as_folder(create_worklets_visitor(None)),
                     |_, _| noop(),
                 )
             })

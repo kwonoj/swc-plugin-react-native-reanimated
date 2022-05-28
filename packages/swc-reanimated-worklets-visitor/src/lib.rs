@@ -1,3 +1,5 @@
+mod constants;
+use crate::constants::GLOBALS;
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
     es2020::{nullish_coalescing, optional_chaining},
@@ -8,7 +10,15 @@ use swc_ecmascript::{
 };
 use swc_visit::chain;
 
-struct ReanimatedWorkletsVisitor;
+struct ReanimatedWorkletsVisitor {
+    globals: Vec<String>,
+}
+
+impl ReanimatedWorkletsVisitor {
+    pub fn new(globals: Vec<String>) -> Self {
+        ReanimatedWorkletsVisitor { globals }
+    }
+}
 
 // TODO: this mimics existing plugin behavior runs specific transform pass
 // before running actual visitor.
@@ -25,15 +35,19 @@ impl VisitMut for ReanimatedWorkletsVisitor {
     fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {}
 }
 
-pub fn create_worklets_visitor() -> impl VisitMut {
-    // allows adding custom globals such as host-functions
-    /*
-    if (this.opts != null && Array.isArray(this.opts.globals)) {
-        this.opts.globals.forEach((name) => {
-          globals.add(name);
-        });
-    }
-    */
+pub struct WorkletsOptions {
+    custom_globals: Option<Vec<String>>,
+}
 
-    ReanimatedWorkletsVisitor
+pub fn create_worklets_visitor(worklets_options: Option<WorkletsOptions>) -> impl VisitMut {
+    let mut globals_vec = GLOBALS.map(|v| v.to_string()).to_vec();
+
+    // allows adding custom globals such as host-functions
+    if let Some(worklets_options) = worklets_options {
+        if let Some(custom_globals) = worklets_options.custom_globals {
+            globals_vec.extend(custom_globals);
+        }
+    };
+
+    ReanimatedWorkletsVisitor::new(globals_vec)
 }
