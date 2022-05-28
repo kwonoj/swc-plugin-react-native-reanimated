@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`fixture with custom transform transforms 1`] = `
+exports[`fixture with plugin transforms 1`] = `
 "\\"use strict\\";
 var _reactNativeReanimated = _interopRequireWildcard(require(\\"react-native-reanimated\\"));
 function _getRequireWildcardCache() {
@@ -44,23 +44,31 @@ function _interopRequireWildcard(obj) {
 }
 function Box() {
     const offset = (0, _reactNativeReanimated).useSharedValue(0);
-    const animatedStyles = (0, _reactNativeReanimated).useAnimatedStyle(()=>{
+    const animatedStyles = (0, _reactNativeReanimated.useAnimatedStyle)(function () {
+        var _f = function _f() {
         return {
-            transform: [
-                {
-                    translateX: offset.value * 255
-                }
-            ]
+            transform: [{
+            translateX: offset.value * 255
+            }]
         };
-    });
+        };
+
+        _f._closure = {
+        offset: offset
+        };
+        _f.asString = \\"function _f(){const{offset}=jsThis._closure;{return{transform:[{translateX:offset.value*255}]};}}\\";
+        _f.__workletHash = 7114514849439;
+        _f.__location = \\"${ process.cwd() }/jest tests fixture (10:48)\\";
+        _f.__optimalization = 3;
+        return _f;
+    }());
     return /*#__PURE__*/ React.createElement(React.Fragment, null, /*#__PURE__*/ React.createElement(_reactNativeReanimated.default.View, {
         style: [
             styles.box,
             animatedStyles
         ]
     }), /*#__PURE__*/ React.createElement(Button, {
-        onPress: ()=>offset.value = Math.random()
-        ,
+        onPress: ()=>offset.value = Math.random(),
         title: \\"Move\\"
     }));
 }

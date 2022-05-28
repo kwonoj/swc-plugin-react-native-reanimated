@@ -35,6 +35,7 @@ const transformPresets: Array<[string, (code: string) => ReturnType<typeof impor
     const { transformSync } = require('@swc/core');
     return transformSync(code, opt)
   }],
+  /*
   ['custom transform', (code: string) => {
     const { transformSync } = require("../index");
     return transformSync(
@@ -43,6 +44,7 @@ const transformPresets: Array<[string, (code: string) => ReturnType<typeof impor
       Buffer.from(JSON.stringify(options))
     );
   }]
+  */
 ];
 
 describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
