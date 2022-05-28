@@ -29,7 +29,7 @@
   "scripts": {
     "prepublishOnly": "npm-run-all test && npm run build:plugin -- --release",
     "build:all": "npm-run-all build:customtransform build:plugin",
-    "build:customtransform": "napi build --platform --cargo-cwd ./spec/swc-coverage-custom-transform",
+    "build:customtransform": "napi build --platform --cargo-cwd ./spec/swc-reanimated-custom-transform",
     "build:plugin": "cargo build -p swc-plugin-reanimated --target wasm32-wasi",
     "test:plugin": "npm-run-all build:all && jest",
     "test:customtransform": "npm-run-all build:all && cross-env SWC_TRANSFORM_CUSTOM=1 jest",
