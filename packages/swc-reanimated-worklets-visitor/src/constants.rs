@@ -1,3 +1,5 @@
+pub static OBJECT_HOOKS: [&str; 2] = ["useAnimatedGestureHandler", "useAnimatedScrollHandler"];
+
 pub static GLOBALS: [&str; 54] = [
     "this",
     "console",

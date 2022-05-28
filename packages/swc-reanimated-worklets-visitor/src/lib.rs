@@ -1,5 +1,7 @@
 mod constants;
 use crate::constants::GLOBALS;
+use constants::OBJECT_HOOKS;
+use swc_common::DUMMY_SP;
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
     es2020::{nullish_coalescing, optional_chaining},
@@ -48,12 +50,75 @@ impl ReanimatedWorkletsVisitor {
         }
     }
 
+    // Returns a new FunctionExpression which is a workletized version of provided
+    // FunctionDeclaration, FunctionExpression, ArrowFunctionExpression or ObjectMethod.
+    fn make_worklet_method_prop(&mut self, method_prop: &MethodProp) {
+        let fn_name = match &method_prop.key {
+            PropName::Ident(id) => id.clone(),
+            PropName::Str(str) => Ident::new(str.value.clone(), DUMMY_SP),
+            PropName::Num(num) => Ident::new(num.value.to_string().into(), DUMMY_SP),
+            _ => Ident::new("_f".into(), DUMMY_SP),
+        };
+    }
+
+    fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
+        //let new_fn = self.make_worklet_method_prop(method_prop);
+
+        //let replacement=
+        /*
+        const newFun = makeWorklet(t, path, state);
+
+        const replacement = t.objectProperty(
+          t.identifier(path.node.key.name),
+          t.callExpression(newFun, [])
+        );
+
+        path.replaceWith(replacement);
+        */
+    }
+
     fn process_worklets(&mut self, call_expr: &mut CallExpr) {
         let name = if let Callee::Expr(expr) = &call_expr.callee {
             self.get_callee_expr_ident(&*expr)
         } else {
             None
         };
+
+        match name {
+            Some(name) if OBJECT_HOOKS.contains(&&*name.sym) && call_expr.args.len() > 0 => {
+                let arg = call_expr.args.get_mut(0).expect("should have args");
+
+                if let Expr::Object(object_expr) = &mut *arg.expr {
+                    let properties = &mut object_expr.props;
+                    for property in properties {
+                        if let PropOrSpread::Prop(prop) = property {
+                            match &mut **prop {
+                                Prop::Method(..) => {
+                                    self.process_worklet_object_method(property);
+                                    //self.process_worklet_object_method(property);
+                                }
+                                Prop::KeyValue(KeyValueProp { value, .. })
+                                | Prop::Assign(AssignProp { value, .. }) => {
+                                    //processWorkletFunction(t, value, state);
+                                }
+                                _ => {
+                                    //processWorkletFunction(t, value, state);
+                                }
+                            };
+                        }
+                    }
+                } else {
+                    /*
+                    const indexes = functionArgsToWorkletize.get(name);
+                    if (Array.isArray(indexes)) {
+                      indexes.forEach((index) => {
+                        processWorkletFunction(t, path.get(`arguments.${index}`), state);
+                      });
+                    } */
+                }
+            }
+            _ => {}
+        }
     }
 }
 
