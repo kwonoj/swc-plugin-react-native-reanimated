@@ -3,4 +3,4 @@ members = [
   "packages/swc-reanimated-worklets-visitor",
   "packages/swc-plugin-reanimated"
 ]
-exclude = []
+exclude = ["spec/swc-reanimated-custom-transform"]
