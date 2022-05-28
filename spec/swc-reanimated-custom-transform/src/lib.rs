@@ -20,7 +20,7 @@ use std::path::Path;
 use napi::bindgen_prelude::Buffer;
 use swc::{config::Options, TransformOutput};
 use swc_common::FileName;
-use swc_ecmascript::transforms::pass::noop;
+use swc_ecmascript::{transforms::pass::noop, visit::as_folder};
 
 use crate::util::{get_deserialized, try_with, MapErr};
 
@@ -89,7 +89,7 @@ pub fn transform_sync(s: String, _is_module: bool, opts: Buffer) -> napi::Result
                     None,
                     handler,
                     &options,
-                    |_program, _comments| create_worklets_visitor(),
+                    |_program, _comments| as_folder(create_worklets_visitor()),
                     |_, _| noop(),
                 )
             })
