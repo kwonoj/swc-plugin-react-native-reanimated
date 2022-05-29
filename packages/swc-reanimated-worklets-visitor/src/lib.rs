@@ -77,6 +77,10 @@ impl ReanimatedWorkletsVisitor {
         */
     }
 
+    fn process_worklet_function(&mut self) {
+        todo!("not implemented");
+    }
+
     fn process_worklets(&mut self, call_expr: &mut CallExpr) {
         let name = if let Callee::Expr(expr) = &call_expr.callee {
             self.get_callee_expr_ident(&*expr)
@@ -95,14 +99,9 @@ impl ReanimatedWorkletsVisitor {
                             match &mut **prop {
                                 Prop::Method(..) => {
                                     self.process_worklet_object_method(property);
-                                    //self.process_worklet_object_method(property);
-                                }
-                                Prop::KeyValue(KeyValueProp { value, .. })
-                                | Prop::Assign(AssignProp { value, .. }) => {
-                                    //processWorkletFunction(t, value, state);
                                 }
                                 _ => {
-                                    //processWorkletFunction(t, value, state);
+                                    self.process_worklet_function();
                                 }
                             };
                         }
