@@ -8,6 +8,7 @@ use swc_ecma_transforms_compat::{
 };
 use swc_ecmascript::{
     ast::*,
+    utils::function,
     visit::{as_folder, VisitMut},
 };
 use swc_visit::chain;
@@ -61,20 +62,24 @@ impl ReanimatedWorkletsVisitor {
         };
     }
 
+    fn make_worklet(&mut self) -> Function {
+        todo!("unimplemented");
+    }
+
     fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
-        //let new_fn = self.make_worklet_method_prop(method_prop);
+        let key = if let PropOrSpread::Prop(prop) = method_prop {
+            match &**prop {
+                Prop::Method(MethodProp { key,.. }) => Some(key.clone()),
+                _ => None
+            }
+        } else {
+            None
+        };
 
-        //let replacement=
-        /*
-        const newFun = makeWorklet(t, path, state);
-
-        const replacement = t.objectProperty(
-          t.identifier(path.node.key.name),
-          t.callExpression(newFun, [])
-        );
-
-        path.replaceWith(replacement);
-        */
+        if let Some(key) = key {
+            let function = self.make_worklet();
+            *method_prop = PropOrSpread::Prop(Box::new(Prop::Method(MethodProp { key, function })));
+        }
     }
 
     fn process_worklet_function(&mut self) {
