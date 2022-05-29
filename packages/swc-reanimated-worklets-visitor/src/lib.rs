@@ -8,6 +8,7 @@ use swc_ecma_transforms_compat::{
 };
 use swc_ecmascript::{
     ast::*,
+    utils::function,
     visit::{as_folder, VisitMut},
 };
 use swc_visit::chain;
@@ -61,20 +62,28 @@ impl ReanimatedWorkletsVisitor {
         };
     }
 
+    fn make_worklet(&mut self) -> Function {
+        todo!("unimplemented");
+    }
+
     fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
-        //let new_fn = self.make_worklet_method_prop(method_prop);
+        let key = if let PropOrSpread::Prop(prop) = method_prop {
+            match &**prop {
+                Prop::Method(MethodProp { key,.. }) => Some(key.clone()),
+                _ => None
+            }
+        } else {
+            None
+        };
 
-        //let replacement=
-        /*
-        const newFun = makeWorklet(t, path, state);
+        if let Some(key) = key {
+            let function = self.make_worklet();
+            *method_prop = PropOrSpread::Prop(Box::new(Prop::Method(MethodProp { key, function })));
+        }
+    }
 
-        const replacement = t.objectProperty(
-          t.identifier(path.node.key.name),
-          t.callExpression(newFun, [])
-        );
-
-        path.replaceWith(replacement);
-        */
+    fn process_worklet_function(&mut self) {
+        todo!("not implemented");
     }
 
     fn process_worklets(&mut self, call_expr: &mut CallExpr) {
@@ -95,14 +104,9 @@ impl ReanimatedWorkletsVisitor {
                             match &mut **prop {
                                 Prop::Method(..) => {
                                     self.process_worklet_object_method(property);
-                                    //self.process_worklet_object_method(property);
-                                }
-                                Prop::KeyValue(KeyValueProp { value, .. })
-                                | Prop::Assign(AssignProp { value, .. }) => {
-                                    //processWorkletFunction(t, value, state);
                                 }
                                 _ => {
-                                    //processWorkletFunction(t, value, state);
+                                    self.process_worklet_function();
                                 }
                             };
                         }
