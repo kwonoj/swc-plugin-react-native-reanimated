@@ -9,7 +9,7 @@ use swc_ecma_transforms_compat::{
 use swc_ecmascript::{
     ast::*,
     utils::function,
-    visit::{as_folder, VisitMut},
+    visit::{as_folder, VisitMut, VisitMutWith},
 };
 use swc_visit::chain;
 
@@ -62,8 +62,50 @@ impl ReanimatedWorkletsVisitor {
         };
     }
 
-    fn make_worklet(&mut self) -> Function {
-        todo!("unimplemented");
+    fn make_worklet_name(&mut self) {
+        todo!("not implemented");
+    }
+
+    // Returns a new FunctionExpression which is a workletized version of provided
+    // FunctionDeclaration, FunctionExpression, ArrowFunctionExpression or ObjectMethod.
+    fn make_worklet(&mut self, e: &mut PropOrSpread) -> Function {
+        // TODO: consolidate into make_worklet_name
+        let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
+
+        // TODO
+        /*
+        // remove 'worklet'; directive before calling .toString()
+        fun.traverse({
+            DirectiveLiteral(path) {
+            if (path.node.value === 'worklet' && path.getFunctionParent() === fun) {
+                path.parentPath.remove();
+            }
+            },
+        });
+
+        // We use copy because some of the plugins don't update bindings and
+        // some even break them
+
+        const code =
+            '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
+        */
+
+        // TODO: this mimics existing plugin behavior runs specific transform pass
+        // before running actual visitor.
+        // 1. This may not required
+        // 2. If required, need to way to pass config to visitors instead of Default::default()
+        // https://github.com/software-mansion/react-native-reanimated/blob/b4ee4ea9a1f246c461dd1819c6f3d48440a25756/plugin.js#L367-L371=
+        let mut preprocessor = chain!(
+            shorthand(),
+            arrow(),
+            optional_chaining(Default::default()),
+            nullish_coalescing(Default::default()),
+            template_literal(Default::default())
+        );
+
+        e.visit_mut_with(&mut preprocessor);
+
+        todo!("not implemented");
     }
 
     fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
@@ -77,7 +119,7 @@ impl ReanimatedWorkletsVisitor {
         };
 
         if let Some(key) = key {
-            let function = self.make_worklet();
+            let function = self.make_worklet(method_prop);
             *method_prop = PropOrSpread::Prop(Box::new(Prop::Method(MethodProp { key, function })));
         }
     }
@@ -126,11 +168,6 @@ impl ReanimatedWorkletsVisitor {
     }
 }
 
-// TODO: this mimics existing plugin behavior runs specific transform pass
-// before running actual visitor.
-// 1. This may not required
-// 2. If required, need to way to pass config to visitors instead of Default::default()
-// https://github.com/software-mansion/react-native-reanimated/blob/b4ee4ea9a1f246c461dd1819c6f3d48440a25756/plugin.js#L367-L371=
 impl VisitMut for ReanimatedWorkletsVisitor {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         self.process_worklets(call_expr);
