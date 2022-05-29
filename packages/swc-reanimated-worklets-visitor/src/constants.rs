@@ -1,5 +1,7 @@
 pub static OBJECT_HOOKS: [&str; 2] = ["useAnimatedGestureHandler", "useAnimatedScrollHandler"];
 
+pub static POSSIBLE_OPT_FUNCTION: [&str; 1] = ["interpolate"];
+
 pub static GLOBALS: [&str; 54] = [
     "this",
     "console",
@@ -56,3 +58,6 @@ pub static GLOBALS: [&str; 54] = [
     "_stopObservingProgress",
     "_startObservingProgress",
 ];
+
+pub static FUNCTIONLESS_FLAG: i32 = 0b00000001;
+pub static STATEMENTLESS_FLAG: i32 = 0b00000010;
