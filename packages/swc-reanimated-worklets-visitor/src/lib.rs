@@ -1,6 +1,6 @@
 mod constants;
 use crate::constants::GLOBALS;
-use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, STATEMENTLESS_FLAG, POSSIBLE_OPT_FUNCTION};
+use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
 use swc_common::DUMMY_SP;
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
@@ -20,9 +20,7 @@ fn get_callee_expr_ident(expr: &Expr) -> Option<Ident> {
         Expr::Member(member_expr) => match &member_expr.prop {
             MemberProp::Ident(ident) => Some(ident.clone()),
             MemberProp::PrivateName(PrivateName { id, .. }) => Some(id.clone()),
-            MemberProp::Computed(ComputedPropName { expr, .. }) => {
-                get_callee_expr_ident(&*expr)
-            }
+            MemberProp::Computed(ComputedPropName { expr, .. }) => get_callee_expr_ident(&*expr),
         },
         Expr::Fn(FnExpr { ident, .. }) => ident.clone(),
         Expr::Call(CallExpr { callee, .. }) => {
@@ -79,11 +77,43 @@ impl Visit for OptimizationFinderVisitor {
             let name = get_callee_expr_ident(&*expr);
 
             if let Some(name) = name {
-                if !POSSIBLE_OPT_FUNCTION.iter().any(|v| { *v == &*name.sym }) {
+                if !POSSIBLE_OPT_FUNCTION.iter().any(|v| *v == &*name.sym) {
                     self.is_fn_call = true;
                 }
             }
         }
+    }
+}
+
+struct ClosureIdentVisitor {}
+
+impl Visit for ClosureIdentVisitor {
+    fn visit_member_expr(&mut self, _member_expr: &MemberExpr) {
+        //noop
+    }
+
+    fn visit_object_lit(&mut self, object_expr: &ObjectLit) {
+        for prop in &object_expr.props {
+            match prop {
+                PropOrSpread::Prop(p) => {
+                    let p = &**p;
+                    match p {
+                        Prop::Shorthand(..) | Prop::KeyValue(..) => {}
+                        _ => prop.visit_with(self),
+                    }
+                }
+                PropOrSpread::Spread(..) => prop.visit_with(self),
+            };
+        }
+    }
+
+    //fn visit_binding_ident(&mut self, ident: &BindingIdent) {}
+    fn visit_ident(&mut self, ident: &Ident) {
+
+    }
+
+    fn visit_assign_expr(&mut self, assign_expr: &AssignExpr) {
+
     }
 }
 
@@ -156,6 +186,13 @@ impl ReanimatedWorkletsVisitor {
 
         let mut opt_find_visitor = OptimizationFinderVisitor::new();
         e.visit_with(&mut opt_find_visitor);
+
+        /*
+          const closure = new Map();
+            const outputs = new Set();
+            const closureGenerator = new ClosureGenerator();
+            const options = {};
+        */
 
         let opt_flags = opt_find_visitor.calculate_flags();
 
