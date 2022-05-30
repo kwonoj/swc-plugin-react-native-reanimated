@@ -1,7 +1,7 @@
 mod constants;
 use crate::constants::GLOBALS;
 use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
-use swc_common::DUMMY_SP;
+use swc_common::{util::take::Take, DUMMY_SP};
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
     es2020::{nullish_coalescing, optional_chaining},
@@ -108,13 +108,9 @@ impl Visit for ClosureIdentVisitor {
     }
 
     //fn visit_binding_ident(&mut self, ident: &BindingIdent) {}
-    fn visit_ident(&mut self, ident: &Ident) {
+    fn visit_ident(&mut self, ident: &Ident) {}
 
-    }
-
-    fn visit_assign_expr(&mut self, assign_expr: &AssignExpr) {
-
-    }
+    fn visit_assign_expr(&mut self, assign_expr: &AssignExpr) {}
 }
 
 struct ReanimatedWorkletsVisitor {
@@ -147,7 +143,7 @@ impl ReanimatedWorkletsVisitor {
 
     // Returns a new FunctionExpression which is a workletized version of provided
     // FunctionDeclaration, FunctionExpression, ArrowFunctionExpression or ObjectMethod.
-    fn make_worklet(&mut self, e: &mut PropOrSpread) -> Function {
+    fn make_worklet(&mut self, function: &mut Function) -> Function {
         // TODO: consolidate into make_worklet_name
         let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
 
@@ -182,10 +178,10 @@ impl ReanimatedWorkletsVisitor {
             template_literal(Default::default())
         );
 
-        e.visit_mut_with(&mut preprocessor);
+        function.visit_mut_with(&mut preprocessor);
 
         let mut opt_find_visitor = OptimizationFinderVisitor::new();
-        e.visit_with(&mut opt_find_visitor);
+        function.visit_with(&mut opt_find_visitor);
 
         /*
           const closure = new Map();
@@ -247,6 +243,10 @@ impl ReanimatedWorkletsVisitor {
         });
         */
 
+        let function_expr = if function.body.is_some() {
+        } else {
+        };
+
         /*
         const variables = Array.from(closure.values());
 
@@ -281,7 +281,124 @@ impl ReanimatedWorkletsVisitor {
         }
         */
 
-        todo!("not implemented");
+        Function { ..function.take() }
+    }
+
+    fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
+        /*
+        const privateFunctionId = t.identifier('_f');
+        const clone = t.cloneNode(fun.node);
+        let funExpression;
+        if (clone.body.type === 'BlockStatement') {
+            funExpression = t.functionExpression(null, clone.params, clone.body);
+        } else {
+            funExpression = clone;
+        }
+        const funString = buildWorkletString(
+            t,
+            transformed.ast,
+            variables,
+            functionName
+        );
+        const workletHash = hash(funString);
+
+        let location = state.file.opts.filename;
+        if (state.opts.relativeSourceLocation) {
+            const path = require('path');
+            location = path.relative(state.cwd, location);
+        }
+
+        const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
+        if (loc) {
+            const { line, column } = loc;
+            if (typeof line === 'number' && typeof column === 'number') {
+            location = `${location} (${line}:${column})`;
+            }
+        }
+
+        const statements = [
+            t.variableDeclaration('const', [
+            t.variableDeclarator(privateFunctionId, funExpression),
+            ]),
+            t.expressionStatement(
+            t.assignmentExpression(
+                '=',
+                t.memberExpression(privateFunctionId, t.identifier('_closure'), false),
+                closureGenerator.generate(t, variables, closure.keys())
+            )
+            ),
+            t.expressionStatement(
+            t.assignmentExpression(
+                '=',
+                t.memberExpression(privateFunctionId, t.identifier('asString'), false),
+                t.stringLiteral(funString)
+            )
+            ),
+            t.expressionStatement(
+            t.assignmentExpression(
+                '=',
+                t.memberExpression(
+                privateFunctionId,
+                t.identifier('__workletHash'),
+                false
+                ),
+                t.numericLiteral(workletHash)
+            )
+            ),
+            t.expressionStatement(
+            t.assignmentExpression(
+                '=',
+                t.memberExpression(
+                privateFunctionId,
+                t.identifier('__location'),
+                false
+                ),
+                t.stringLiteral(location)
+            )
+            ),
+        ];
+
+        if (options && options.optFlags) {
+            statements.push(
+            t.expressionStatement(
+                t.assignmentExpression(
+                '=',
+                t.memberExpression(
+                    privateFunctionId,
+                    t.identifier('__optimalization'),
+                    false
+                ),
+                t.numericLiteral(options.optFlags)
+                )
+            )
+            );
+        }
+        */
+        // TODO: consolidate into make_worklet_name
+        let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
+
+        let mut stmts = vec![];
+
+        stmts.push(Stmt::Return(ReturnStmt {
+            span: DUMMY_SP,
+            arg: Some(Box::new(Expr::Ident(dummy_fn_name))),
+        }));
+
+        let body = BlockStmt {
+            span: DUMMY_SP,
+            stmts,
+        };
+
+        Function {
+            params: arrow_expr.params.drain(..).map(Param::from).collect(),
+            decorators: Default::default(),
+            span: DUMMY_SP,
+            body: Some(body),
+            is_generator: arrow_expr.is_generator,
+            is_async: arrow_expr.is_async,
+            type_params: arrow_expr.type_params.take(),
+            return_type: arrow_expr.return_type.take(),
+        }
     }
 
     fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
@@ -295,13 +412,56 @@ impl ReanimatedWorkletsVisitor {
         };
 
         if let Some(key) = key {
-            let function = self.make_worklet(method_prop);
-            *method_prop = PropOrSpread::Prop(Box::new(Prop::Method(MethodProp { key, function })));
+            let function = if let PropOrSpread::Prop(prop) = method_prop {
+                if let Prop::Method(MethodProp { function, .. }) = &mut **prop {
+                    Some(self.make_worklet(function))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            if let Some(function) = function {
+                *method_prop =
+                    PropOrSpread::Prop(Box::new(Prop::Method(MethodProp { key, function })));
+            }
         }
     }
 
-    fn process_worklet_function(&mut self) {
-        todo!("not implemented");
+    fn process_worklet_function(&mut self, fn_like_expr: &mut Expr) {
+        /*
+          const newFun = makeWorklet(t, fun, state);
+
+        const replacement = t.callExpression(newFun, []);
+
+        // we check if function needs to be assigned to variable declaration.
+        // This is needed if function definition directly in a scope. Some other ways
+        // where function definition can be used is for example with variable declaration:
+        // const ggg = function foo() { }
+        // ^ in such a case we don't need to define variable for the function
+        const needDeclaration =
+            t.isScopable(fun.parent) || t.isExportNamedDeclaration(fun.parent);
+        fun.replaceWith(
+            fun.node.id && needDeclaration
+            ? t.variableDeclaration('const', [
+                t.variableDeclarator(fun.node.id, replacement),
+                ])
+            : replacement
+        );
+        */
+        match fn_like_expr {
+            Expr::Arrow(arrow_expr) => {
+                let fn_expr = self.make_worklet_from_arrow(arrow_expr);
+
+                *fn_like_expr = Expr::Fn(FnExpr {
+                    ident: Default::default(),
+                    function: fn_expr,
+                });
+            }
+            Expr::Fn(fn_expr) => {}
+            _ => {}
+        }
     }
 
     fn process_worklets(&mut self, call_expr: &mut CallExpr) {
@@ -327,9 +487,10 @@ impl ReanimatedWorkletsVisitor {
                                 Prop::Method(..) => {
                                     self.process_worklet_object_method(property);
                                 }
-                                _ => {
-                                    self.process_worklet_function();
+                                Prop::KeyValue(KeyValueProp { value, .. }) => {
+                                    self.process_worklet_function(&mut **value);
                                 }
+                                _ => {}
                             };
                         }
                     }
