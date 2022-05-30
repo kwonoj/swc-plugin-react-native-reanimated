@@ -3,11 +3,10 @@
 exports[`fixture with plugin workletizes object hook wrapped ArrowFunctionExpression automatically 1`] = `
 "\\"use strict\\";
 useAnimatedGestureHandler({
-    onStart: function () {
-        var _f = function _f(event) {
-        console.log(event);
+    onStart: function() {
+        const _f = function _f(event) {
+            console.log(event);
         };
-
         _f._closure = {};
         _f.asString = \\"function _f(event){console.log(event);}\\";
         _f.__workletHash = 2164830539996;
