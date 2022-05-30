@@ -371,6 +371,7 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
+    console.log(code);
     expect(code).toContain('_f.__workletHash');
     expect(code).toMatchSnapshot();
   });

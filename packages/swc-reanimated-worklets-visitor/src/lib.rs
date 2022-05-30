@@ -286,98 +286,168 @@ impl ReanimatedWorkletsVisitor {
 
     fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
         /*
-        const privateFunctionId = t.identifier('_f');
-        const clone = t.cloneNode(fun.node);
-        let funExpression;
-        if (clone.body.type === 'BlockStatement') {
-            funExpression = t.functionExpression(null, clone.params, clone.body);
-        } else {
-            funExpression = clone;
-        }
-        const funString = buildWorkletString(
-            t,
-            transformed.ast,
-            variables,
-            functionName
-        );
-        const workletHash = hash(funString);
+              const privateFunctionId = t.identifier('_f');
+              const clone = t.cloneNode(fun.node);
+              let funExpression;
+              if (clone.body.type === 'BlockStatement') {
+                  funExpression = t.functionExpression(null, clone.params, clone.body);
+              } else {
+                  funExpression = clone;
+              }
+              const funString = buildWorkletString(
+                  t,
+                  transformed.ast,
+                  variables,
+                  functionName
+              );
+              const workletHash = hash(funString);
 
-        let location = state.file.opts.filename;
-        if (state.opts.relativeSourceLocation) {
-            const path = require('path');
-            location = path.relative(state.cwd, location);
-        }
+              let location = state.file.opts.filename;
+              if (state.opts.relativeSourceLocation) {
+                  const path = require('path');
+                  location = path.relative(state.cwd, location);
+              }
 
-        const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
-        if (loc) {
-            const { line, column } = loc;
-            if (typeof line === 'number' && typeof column === 'number') {
-            location = `${location} (${line}:${column})`;
-            }
-        }
+              const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
+              if (loc) {
+                  const { line, column } = loc;
+                  if (typeof line === 'number' && typeof column === 'number') {
+                  location = `${location} (${line}:${column})`;
+                  }
+              }
 
-        const statements = [
-            t.variableDeclaration('const', [
-            t.variableDeclarator(privateFunctionId, funExpression),
-            ]),
-            t.expressionStatement(
-            t.assignmentExpression(
-                '=',
-                t.memberExpression(privateFunctionId, t.identifier('_closure'), false),
-                closureGenerator.generate(t, variables, closure.keys())
-            )
-            ),
-            t.expressionStatement(
-            t.assignmentExpression(
-                '=',
-                t.memberExpression(privateFunctionId, t.identifier('asString'), false),
-                t.stringLiteral(funString)
-            )
-            ),
-            t.expressionStatement(
-            t.assignmentExpression(
-                '=',
-                t.memberExpression(
-                privateFunctionId,
-                t.identifier('__workletHash'),
-                false
-                ),
-                t.numericLiteral(workletHash)
-            )
-            ),
-            t.expressionStatement(
-            t.assignmentExpression(
-                '=',
-                t.memberExpression(
-                privateFunctionId,
-                t.identifier('__location'),
-                false
-                ),
-                t.stringLiteral(location)
-            )
-            ),
+              const statements = [
+          //t.variableDeclaration('const', [ t.variableDeclarator(privateFunctionId, funExpression), ]),
+          //t.expressionStatement(t.assignmentExpression('=',t.memberExpression(privateFunctionId, t.identifier('_closure'), false),closureGenerator.generate(t, variables, closure.keys()))),
+          //t.expressionStatement(t.assignmentExpression('=', t.memberExpression(privateFunctionId, t.identifier('asString'), false), t.stringLiteral(funString))),
+          //t.expressionStatement(t.assignmentExpression('=',t.memberExpression(privateFunctionId,t.identifier('__workletHash'),false),t.numericLiteral(workletHash))),
+          //t.expressionStatement(
+        //t.assignmentExpression('=',t.memberExpression(privateFunctionId,t.identifier('__location'),false),t.stringLiteral(location))
+          ),
         ];
 
-        if (options && options.optFlags) {
-            statements.push(
-            t.expressionStatement(
-                t.assignmentExpression(
-                '=',
-                t.memberExpression(
-                    privateFunctionId,
-                    t.identifier('__optimalization'),
-                    false
-                ),
-                t.numericLiteral(options.optFlags)
-                )
-            )
-            );
-        }
-        */
+              if (options && options.optFlags) {
+                  statements.push(
+                  t.expressionStatement(
+                      t.assignmentExpression(
+                      '=',
+                      t.memberExpression(
+                          privateFunctionId,
+                          t.identifier('__optimalization'),
+                          false
+                      ),
+                      t.numericLiteral(options.optFlags)
+                      )
+                  )
+                  );
+              }
+              */
         // TODO: consolidate into make_worklet_name
         let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
+        let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
+        let as_string_ident = Ident::new("asString".into(), DUMMY_SP);
+        let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
+        let location_ident = Ident::new("__location".into(), DUMMY_SP);
 
-        let mut stmts = vec![];
+        // TODO: need to use closuregenerator
+        let dummy_closure = Expr::Object(ObjectLit::dummy());
+
+        let func_expr = match arrow_expr.body.take() {
+            BlockStmtOrExpr::BlockStmt(body) => Expr::Fn(FnExpr {
+                ident: Some(dummy_fn_name.clone()),
+                function: Function {
+                    params: arrow_expr.params.drain(..).map(Param::from).collect(),
+                    decorators: Default::default(),
+                    span: DUMMY_SP,
+                    body: Some(body),
+                    is_generator: arrow_expr.is_generator,
+                    is_async: arrow_expr.is_async,
+                    type_params: arrow_expr.type_params.take(),
+                    return_type: arrow_expr.return_type.take(),
+                },
+            }),
+            BlockStmtOrExpr::Expr(e) => *e,
+        };
+
+        let mut stmts = vec![
+            // a function closure wraps original,
+            // const _f = function () { .. }
+            Stmt::Decl(Decl::Var(VarDecl {
+                span: DUMMY_SP,
+                declare: false,
+                kind: VarDeclKind::Const,
+                decls: vec![VarDeclarator {
+                    span: DUMMY_SP,
+                    definite: false,
+                    name: Pat::Ident(BindingIdent::from(dummy_fn_name.clone())),
+                    init: Some(Box::new(func_expr)),
+                }],
+            })),
+            // _f._closure = {...}
+            Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(AssignExpr {
+                    span: DUMMY_SP,
+                    op: AssignOp::Assign,
+                    left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        prop: MemberProp::Ident(closure_ident.clone()),
+                    }))),
+                    // TODO: this is not complete
+                    right: Box::new(dummy_closure.clone()),
+                })),
+            }),
+            // _f.asString
+            Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(AssignExpr {
+                    span: DUMMY_SP,
+                    op: AssignOp::Assign,
+                    left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        prop: MemberProp::Ident(as_string_ident.clone()),
+                    }))),
+                    // TODO: this is not complete
+                    right: Box::new(dummy_closure.clone()),
+                })),
+            }),
+            //_f.__workletHash
+            Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(AssignExpr {
+                    span: DUMMY_SP,
+                    op: AssignOp::Assign,
+                    left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        prop: MemberProp::Ident(worklet_hash_ident.clone()),
+                    }))),
+                    // TODO: this is not complete
+                    right: Box::new(Expr::Lit(Lit::Num(Number {
+                        span: DUMMY_SP,
+                        value: 1111.into(),
+                        raw: None,
+                    }))),
+                })),
+            }),
+            //_f.__location
+            Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(AssignExpr {
+                    span: DUMMY_SP,
+                    op: AssignOp::Assign,
+                    left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        prop: MemberProp::Ident(location_ident.clone()),
+                    }))),
+                    // TODO: this is not complete
+                    right: Box::new(Expr::Lit(Lit::Str(Str::from("location_dummy")))),
+                })),
+            }),
+        ];
 
         stmts.push(Stmt::Return(ReturnStmt {
             span: DUMMY_SP,
@@ -390,7 +460,7 @@ impl ReanimatedWorkletsVisitor {
         };
 
         Function {
-            params: arrow_expr.params.drain(..).map(Param::from).collect(),
+            params: Default::default(),
             decorators: Default::default(),
             span: DUMMY_SP,
             body: Some(body),
@@ -454,9 +524,12 @@ impl ReanimatedWorkletsVisitor {
             Expr::Arrow(arrow_expr) => {
                 let fn_expr = self.make_worklet_from_arrow(arrow_expr);
 
-                *fn_like_expr = Expr::Fn(FnExpr {
-                    ident: Default::default(),
-                    function: fn_expr,
+                *fn_like_expr = Expr::Call(CallExpr {
+                    callee: Callee::Expr(Box::new(Expr::Fn(FnExpr {
+                        ident: Default::default(),
+                        function: fn_expr,
+                    }))),
+                    ..CallExpr::dummy()
                 });
             }
             Expr::Fn(fn_expr) => {}
