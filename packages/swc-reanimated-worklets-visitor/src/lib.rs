@@ -1,7 +1,7 @@
 mod constants;
 use crate::constants::GLOBALS;
 use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
-use swc_common::{util::take::Take, DUMMY_SP};
+use swc_common::{util::take::Take, FileName, DUMMY_SP};
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
     es2020::{nullish_coalescing, optional_chaining},
@@ -115,13 +115,15 @@ impl Visit for ClosureIdentVisitor {
 
 struct ReanimatedWorkletsVisitor {
     globals: Vec<String>,
+    filename: FileName,
     in_use_animated_style: bool,
 }
 
 impl ReanimatedWorkletsVisitor {
-    pub fn new(globals: Vec<String>) -> Self {
+    pub fn new(globals: Vec<String>, filename: FileName) -> Self {
         ReanimatedWorkletsVisitor {
             globals,
+            filename,
             in_use_animated_style: false,
         }
     }
@@ -286,68 +288,61 @@ impl ReanimatedWorkletsVisitor {
 
     fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
         /*
-              const privateFunctionId = t.identifier('_f');
-              const clone = t.cloneNode(fun.node);
-              let funExpression;
-              if (clone.body.type === 'BlockStatement') {
-                  funExpression = t.functionExpression(null, clone.params, clone.body);
-              } else {
-                  funExpression = clone;
-              }
-              const funString = buildWorkletString(
-                  t,
-                  transformed.ast,
-                  variables,
-                  functionName
-              );
-              const workletHash = hash(funString);
+        const privateFunctionId = t.identifier('_f');
+        const clone = t.cloneNode(fun.node);
+        let funExpression;
+        if (clone.body.type === 'BlockStatement') {
+            funExpression = t.functionExpression(null, clone.params, clone.body);
+        } else {
+            funExpression = clone;
+        }
+        const funString = buildWorkletString(
+            t,
+            transformed.ast,
+            variables,
+            functionName
+        );
+        const workletHash = hash(funString);
 
-              let location = state.file.opts.filename;
-              if (state.opts.relativeSourceLocation) {
-                  const path = require('path');
-                  location = path.relative(state.cwd, location);
-              }
-
-              const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
-              if (loc) {
-                  const { line, column } = loc;
-                  if (typeof line === 'number' && typeof column === 'number') {
-                  location = `${location} (${line}:${column})`;
-                  }
-              }
-
-              const statements = [
-          //t.variableDeclaration('const', [ t.variableDeclarator(privateFunctionId, funExpression), ]),
-          //t.expressionStatement(t.assignmentExpression('=',t.memberExpression(privateFunctionId, t.identifier('_closure'), false),closureGenerator.generate(t, variables, closure.keys()))),
-          //t.expressionStatement(t.assignmentExpression('=', t.memberExpression(privateFunctionId, t.identifier('asString'), false), t.stringLiteral(funString))),
-          //t.expressionStatement(t.assignmentExpression('=',t.memberExpression(privateFunctionId,t.identifier('__workletHash'),false),t.numericLiteral(workletHash))),
-          //t.expressionStatement(
-        //t.assignmentExpression('=',t.memberExpression(privateFunctionId,t.identifier('__location'),false),t.stringLiteral(location))
-          ),
-        ];
-
-              if (options && options.optFlags) {
-                  statements.push(
-                  t.expressionStatement(
-                      t.assignmentExpression(
-                      '=',
-                      t.memberExpression(
-                          privateFunctionId,
-                          t.identifier('__optimalization'),
-                          false
-                      ),
-                      t.numericLiteral(options.optFlags)
-                      )
-                  )
-                  );
-              }
-              */
+        if (options && options.optFlags) {
+            statements.push(
+            t.expressionStatement(
+                t.assignmentExpression(
+                '=',
+                t.memberExpression(
+                    privateFunctionId,
+                    t.identifier('__optimalization'),
+                    false
+                ),
+                t.numericLiteral(options.optFlags)
+                )
+            )
+            );
+        }
+        */
         // TODO: consolidate into make_worklet_name
         let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
         let as_string_ident = Ident::new("asString".into(), DUMMY_SP);
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
         let location_ident = Ident::new("__location".into(), DUMMY_SP);
+
+
+            /*        let location = state.file.opts.filename;
+            if (state.opts.relativeSourceLocation) {
+                const path = require('path');
+                location = path.relative(state.cwd, location);
+            }
+
+            const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
+            if (loc) {
+                const { line, column } = loc;
+                if (typeof line === 'number' && typeof column === 'number') {
+                location = `${location} (${line}:${column})`;
+                }
+            } */
+
+        let code_location = self.filename.to_string();
 
         // TODO: need to use closuregenerator
         let dummy_closure = Expr::Object(ObjectLit::dummy());
@@ -444,7 +439,7 @@ impl ReanimatedWorkletsVisitor {
                         prop: MemberProp::Ident(location_ident.clone()),
                     }))),
                     // TODO: this is not complete
-                    right: Box::new(Expr::Lit(Lit::Str(Str::from("location_dummy")))),
+                    right: Box::new(Expr::Lit(Lit::Str(Str::from(code_location)))),
                 })),
             }),
         ];
@@ -598,17 +593,25 @@ impl VisitMut for ReanimatedWorkletsVisitor {
 
 pub struct WorkletsOptions {
     custom_globals: Option<Vec<String>>,
+    filename: FileName,
 }
 
-pub fn create_worklets_visitor(worklets_options: Option<WorkletsOptions>) -> impl VisitMut {
+impl WorkletsOptions {
+    pub fn new(custom_globals: Option<Vec<String>>, filename: FileName) -> Self {
+        WorkletsOptions {
+            custom_globals,
+            filename,
+        }
+    }
+}
+
+pub fn create_worklets_visitor(worklets_options: WorkletsOptions) -> impl VisitMut {
     let mut globals_vec = GLOBALS.map(|v| v.to_string()).to_vec();
 
     // allows adding custom globals such as host-functions
-    if let Some(worklets_options) = worklets_options {
-        if let Some(custom_globals) = worklets_options.custom_globals {
-            globals_vec.extend(custom_globals);
-        }
+    if let Some(custom_globals) = worklets_options.custom_globals {
+        globals_vec.extend(custom_globals);
     };
 
-    ReanimatedWorkletsVisitor::new(globals_vec)
+    ReanimatedWorkletsVisitor::new(globals_vec, worklets_options.filename)
 }

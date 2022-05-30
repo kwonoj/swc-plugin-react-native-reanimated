@@ -1,7 +1,7 @@
 import * as path from "path";
 
 const options = {
-  filename: 'jest fixtures',
+  filename: path.join(path.resolve(__dirname, ".."), 'jest tests fixture'),
   jsc: {
     parser: {
       syntax: "ecmascript",
