@@ -367,7 +367,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
   // object hooks
 
-  it.skip("workletizes object hook wrapped ArrowFunctionExpression automatically", () => {
+  it("workletizes object hook wrapped ArrowFunctionExpression automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: (event) => {
@@ -394,7 +394,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     });
     "
   `);
-});
+  });
 
   it("workletizes object hook wrapped unnamed FunctionExpression automatically", () => {
     const input = `
