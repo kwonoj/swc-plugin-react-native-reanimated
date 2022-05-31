@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::constants::GLOBALS;
 use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
 use swc_common::{util::take::Take, FileName, SourceMapper, DUMMY_SP};
+use swc_ecma_codegen::{self, text_writer::WriteJs, Emitter, Node};
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
     es2020::{nullish_coalescing, optional_chaining},
@@ -41,6 +42,27 @@ fn get_callee_expr_ident(expr: &Expr) -> Option<Ident> {
         _ => None,
     }
 }
+
+/// Naive port to string-hash-64 original plugin uses
+/// to calculate hash.
+///
+/// TODO: This may not be required. The only reason to port
+/// this fn is trying to mimic original behavior as close.
+/// Confirm if any other hash can be used instead.
+fn calculate_hash(value: &str) -> f64 {
+    let mut hash1: i32 = 5381;
+    let mut hash2: i32 = 52711;
+
+    for c in value.chars().rev() {
+        let char_code = c as i32;
+
+        hash1 = (hash1.overflowing_mul(33).0) ^ char_code;
+        hash2 = (hash2.overflowing_mul(33).0) ^ char_code;
+    }
+
+    (hash1 as u64 >> 0).overflowing_mul(4096).0.overflowing_add((hash2 as u32 >> 0) as u64).0 as f64
+}
+
 
 struct OptimizationFinderVisitor {
     is_stmt: bool,
@@ -152,6 +174,99 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
 
     fn make_worklet_name(&mut self) {
         todo!("not implemented");
+    }
+
+    fn build_worklet_string(&mut self, mut transformed: ArrowExpr, fn_name: Ident) -> String {
+        /*
+        function prependClosureVariablesIfNecessary(closureVariables, body) {
+            if (closureVariables.length === 0) {
+              return body;
+            }
+
+            return t.blockStatement([
+              t.variableDeclaration('const', [
+                t.variableDeclarator(
+                  t.objectPattern(
+                    closureVariables.map((variable) =>
+                      t.objectProperty(
+                        t.identifier(variable.name),
+                        t.identifier(variable.name),
+                        false,
+                        true
+                      )
+                    )
+                  ),
+                  t.memberExpression(t.identifier('jsThis'), t.identifier('_closure'))
+                ),
+              ]),
+              body,
+            ]);
+          }
+
+          traverse(fun, {
+            enter(path) {
+              t.removeComments(path.node);
+            },
+          });
+
+          const workletFunction = t.functionExpression(
+            t.identifier(name),
+            fun.program.body[0].expression.params,
+            prependClosureVariablesIfNecessary(
+              closureVariables,
+              fun.program.body[0].expression.body
+            )
+          );
+
+          return generate(workletFunction, { compact: true }).code;
+         */
+
+        let body = match transformed.body.take() {
+            BlockStmtOrExpr::BlockStmt(body) => body,
+            BlockStmtOrExpr::Expr(e) => BlockStmt {
+                stmts: vec![Stmt::Expr(ExprStmt {
+                    span: DUMMY_SP,
+                    expr: e,
+                })],
+                ..BlockStmt::dummy()
+            },
+        };
+
+        let transformed_function = FnExpr {
+            ident: Some(fn_name),
+            function: Function {
+                params: transformed.params.drain(..).map(Param::from).collect(),
+                body: Some(body),
+                ..Function::dummy()
+            },
+            ..FnExpr::dummy()
+        };
+
+        let mut buf = vec![];
+        {
+            let wr = Box::new(swc_ecma_codegen::text_writer::JsWriter::new(
+                Default::default(),
+                "", //"\n",
+                &mut buf,
+                None,
+            )) as Box<dyn WriteJs>;
+
+            let mut emitter = Emitter {
+                cfg: swc_ecma_codegen::Config {
+                    minify: true, //TODO : is this `compact`?
+                    ..Default::default()
+                },
+                comments: Default::default(),
+                cm: Default::default(),
+                wr,
+            };
+
+            transformed_function
+                .emit_with(&mut emitter)
+                .ok()
+                .expect("Should emit");
+        }
+        String::from_utf8(buf).expect("invalid utf8 character detected")
     }
 
     // Returns a new FunctionExpression which is a workletized version of provided
@@ -331,8 +446,34 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             );
         }
         */
+
         // TODO: consolidate into make_worklet_name
         let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
+
+        // Have to clone to run transform preprocessor without changing original codes
+        let mut cloned_code = arrow_expr.clone();
+        /*
+         const code = '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
+        */
+
+        // TODO: this mimics existing plugin behavior runs specific transform pass
+        // before running actual visitor.
+        // 1. This may not required
+        // 2. If required, need to way to pass config to visitors instead of Default::default()
+        // https://github.com/software-mansion/react-native-reanimated/blob/b4ee4ea9a1f246c461dd1819c6f3d48440a25756/plugin.js#L367-L371=
+        let mut preprocessor = chain!(
+            shorthand(),
+            arrow(),
+            optional_chaining(Default::default()),
+            nullish_coalescing(Default::default()),
+            template_literal(Default::default())
+        );
+        cloned_code.visit_mut_with(&mut preprocessor);
+
+        let func_string = self.build_worklet_string(cloned_code, dummy_fn_name.clone());
+        let func_hash = calculate_hash(&func_string);
+
+
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
         let as_string_ident = Ident::new("asString".into(), DUMMY_SP);
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
@@ -421,7 +562,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
                         prop: MemberProp::Ident(as_string_ident.clone()),
                     }))),
                     // TODO: this is not complete
-                    right: Box::new(dummy_closure.clone()),
+                    right: Box::new(Expr::Lit(Lit::Str(Str::from(func_string)))),
                 })),
             }),
             //_f.__workletHash
@@ -438,7 +579,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
                     // TODO: this is not complete
                     right: Box::new(Expr::Lit(Lit::Num(Number {
                         span: DUMMY_SP,
-                        value: 1111.into(),
+                        value: func_hash.into(),
                         raw: None,
                     }))),
                 })),
@@ -454,7 +595,6 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
                         obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
                         prop: MemberProp::Ident(location_ident.clone()),
                     }))),
-                    // TODO: this is not complete
                     right: Box::new(Expr::Lit(Lit::Str(Str::from(code_location)))),
                 })),
             }),
