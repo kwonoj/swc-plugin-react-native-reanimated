@@ -14,7 +14,10 @@ pub fn process(program: Program, metadata: TransformPluginProgramMetadata) -> Pr
         FileName::Anon
     };
 
-    let visitor = create_worklets_visitor(WorkletsOptions::new(None, filename));
+    let visitor = create_worklets_visitor(
+        WorkletsOptions::new(None, filename),
+        std::sync::Arc::new(metadata.source_map),
+    );
 
     program.fold_with(&mut as_folder(visitor))
 }
