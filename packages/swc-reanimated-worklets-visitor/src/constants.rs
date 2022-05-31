@@ -2,6 +2,19 @@ pub static OBJECT_HOOKS: [&str; 2] = ["useAnimatedGestureHandler", "useAnimatedS
 
 pub static POSSIBLE_OPT_FUNCTION: [&str; 1] = ["interpolate"];
 
+pub static GESTURE_HANDLER_BUILDER_METHODS: [&str; 10] = [
+    "onBegin",
+    "onStart",
+    "onEnd",
+    "onFinalize",
+    "onUpdate",
+    "onChange",
+    "onTouchesDown",
+    "onTouchesMove",
+    "onTouchesUp",
+    "onTouchesCancelled",
+  ];
+
 pub static GLOBALS: [&str; 54] = [
     "this",
     "console",
