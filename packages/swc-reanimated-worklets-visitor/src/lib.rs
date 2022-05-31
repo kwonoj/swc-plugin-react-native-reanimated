@@ -656,25 +656,35 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         }
     }
 
-    fn make_worklet_from_fn_expr(&mut self, fn_expr: &mut FnExpr) -> Function {
+    fn make_worklet_from_fn(
+        &mut self,
+        ident: &mut Option<Ident>,
+        function: &mut Function,
+    ) -> Function {
         self.make_worklet_inner(
             // Have to clone to run transform preprocessor without changing original codes
-            Expr::Fn(fn_expr.clone()),
-            &fn_expr.function.span,
+            Expr::Fn(FnExpr {
+                ident: ident.take(),
+                function: function.clone(),
+            }),
+            &function.span,
             BlockStmtOrExpr::BlockStmt(
-                fn_expr
-                    .function
+                function
                     .body
                     .take()
                     .expect("Expect fn body exists to make worklet fn"),
             ),
-            fn_expr.function.params.take(),
-            fn_expr.function.is_generator,
-            fn_expr.function.is_async,
-            fn_expr.function.type_params.take(),
-            fn_expr.function.return_type.take(),
-            Some(fn_expr.function.decorators.take()),
+            function.params.take(),
+            function.is_generator,
+            function.is_async,
+            function.type_params.take(),
+            function.return_type.take(),
+            Some(function.decorators.take()),
         )
+    }
+
+    fn make_worklet_from_fn_expr(&mut self, fn_expr: &mut FnExpr) -> Function {
+        self.make_worklet_from_fn(&mut fn_expr.ident, &mut fn_expr.function)
     }
 
     fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
@@ -704,7 +714,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         if let Some(key) = key {
             let function = if let PropOrSpread::Prop(prop) = method_prop {
                 if let Prop::Method(MethodProp { function, .. }) = &mut **prop {
-                    Some(self.make_worklet(function))
+                    Some(self.make_worklet_from_fn(&mut None, function))
                 } else {
                     None
                 }
