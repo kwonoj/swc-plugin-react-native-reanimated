@@ -2,7 +2,10 @@ mod constants;
 use std::path::{Path, PathBuf};
 
 use crate::constants::GLOBALS;
-use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
+use constants::{
+    FUNCTIONLESS_FLAG, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION,
+    STATEMENTLESS_FLAG,
+};
 use swc_common::{util::take::Take, FileName, SourceMapper, DUMMY_SP};
 use swc_ecma_codegen::{self, text_writer::WriteJs, Emitter, Node};
 use swc_ecma_transforms_compat::{
@@ -60,9 +63,12 @@ fn calculate_hash(value: &str) -> f64 {
         hash2 = (hash2.overflowing_mul(33).0) ^ char_code;
     }
 
-    (hash1 as u64 >> 0).overflowing_mul(4096).0.overflowing_add((hash2 as u32 >> 0) as u64).0 as f64
+    (hash1 as u64 >> 0)
+        .overflowing_mul(4096)
+        .0
+        .overflowing_add((hash2 as u32 >> 0) as u64)
+        .0 as f64
 }
-
 
 struct OptimizationFinderVisitor {
     is_stmt: bool,
@@ -473,7 +479,6 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         let func_string = self.build_worklet_string(cloned_code, dummy_fn_name.clone());
         let func_hash = calculate_hash(&func_string);
 
-
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
         let as_string_ident = Ident::new("asString".into(), DUMMY_SP);
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
@@ -736,17 +741,87 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
 
     fn process_if_gesture_handler_event_callback_function(&mut self) {
         /*if (
-            t.isCallExpression(fun.parent) &&
-            isGestureObjectEventCallbackMethod(t, fun.parent.callee)
-          ) {
-            processWorkletFunction(t, fun, state);
-          }*/
+          t.isCallExpression(fun.parent) &&
+          isGestureObjectEventCallbackMethod(t, fun.parent.callee)
+        ) {
+          processWorkletFunction(t, fun, state);
+        }*/
     }
+}
+
+/// Checks if node matches `Gesture.Tap()` or similar.
+/*
+node: CallExpression(
+callee: MemberExpression(
+    object: Identifier('Gesture')
+    property: Identifier('Tap')
+)
+)
+*/
+fn is_gesture_object(expr: &Expr) -> bool {
+    if let Expr::Call(call_expr) = expr {
+        if let Callee::Expr(callee) = &call_expr.callee {
+            if let Expr::Member(member_expr) = &**callee {
+                if let Expr::Ident(ident) = &*member_expr.obj {
+                    if let MemberProp::Ident(prop_ident) = &member_expr.prop {
+                        return &*ident.sym == "Gesture"
+                            && GESTURE_HANDLER_BUILDER_METHODS
+                                .iter()
+                                .any(|m| *m == &*prop_ident.sym);
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Checks if node matches the pattern `Gesture.Foo()[*]`
+/// where `[*]` represents any number of chained method calls, like `.something(42)`.
+fn contains_gesture_object(expr: &Expr) -> bool {
+    // direct call
+    if is_gesture_object(expr) {
+        return true;
+    }
+
+    // method chaining
+    if let Expr::Call(call_expr) = expr {
+        if let Callee::Expr(expr) = &call_expr.callee {
+            if let Expr::Member(expr) = &**expr {
+                return contains_gesture_object(&expr.obj);
+            }
+        }
+    }
+    return false;
+}
+
+/// Checks if node matches the pattern `Gesture.Foo()[*].onBar`
+/// where `[*]` represents any number of method calls.
+fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
+    if let Callee::Expr(expr) = callee {
+        if let Expr::Member(expr) = &**expr {
+            if let MemberProp::Ident(ident) = &expr.prop {
+                if GESTURE_HANDLER_BUILDER_METHODS
+                    .iter()
+                    .any(|m| *m == &*ident.sym)
+                {
+                    return contains_gesture_object(&*expr.obj);
+                }
+            }
+        }
+    }
+
+    return false;
 }
 
 impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
-        self.process_worklets(call_expr);
+        if is_gesture_object_event_callback_method(&call_expr.callee) {
+            self.process_if_gesture_handler_event_callback_function();
+        } else {
+            self.process_worklets(call_expr);
+        }
     }
 
     fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {}
