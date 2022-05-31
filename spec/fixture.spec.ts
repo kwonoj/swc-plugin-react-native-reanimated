@@ -1,7 +1,7 @@
 import * as path from "path";
 
 const options = {
-  filename: path.join(path.resolve(__dirname, ".."), 'jest tests fixture'),
+  filename: path.join(path.resolve(__dirname, ".."), "jest tests fixture"),
   jsc: {
     parser: {
       syntax: "ecmascript",
@@ -9,15 +9,21 @@ const options = {
     },
     target: "es2022",
     preserveAllComments: true,
-    experimental: {}
+    experimental: {},
   },
   isModule: true,
   module: {
-    type: "commonjs"
+    type: "commonjs",
   },
-}
+};
 
-const transformPresets: Array<[string, (code: string) => ReturnType<typeof import('@swc/core').transformSync>]> = [
+const transformPresets: Array<
+  [
+    string,
+    (code: string) => ReturnType<typeof import("@swc/core").transformSync>
+  ]
+> = [
+  ,
   /*['plugin', (code: string) => {
     const opt = { ...options };
     opt.jsc.experimental = {
@@ -34,19 +40,17 @@ const transformPresets: Array<[string, (code: string) => ReturnType<typeof impor
 
     const { transformSync } = require('@swc/core');
     return transformSync(code, opt)
-  }]*/,
-  ['custom transform', (code: string) => {
-    const { transformSync } = require("../index");
-    return transformSync(
-      code,
-      true,
-      Buffer.from(JSON.stringify(options))
-    );
-  }]
+  }]*/ [
+    "custom transform",
+    (code: string) => {
+      const { transformSync } = require("../index");
+      return transformSync(code, true, Buffer.from(JSON.stringify(options)));
+    },
+  ],
 ];
 
-describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
-  it('transforms', () => {
+describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
+  it("transforms", () => {
     const input = `
     import Animated, {
       useAnimatedStyle,
@@ -72,10 +76,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
   `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('supports default ES6 style imports', () => {
+  it("supports default ES6 style imports", () => {
     const input = `
       import * as Reanimated from 'react-native-reanimated';
 
@@ -98,7 +102,7 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_closure');
+    expect(code).toContain("_closure");
   });
 
   it("doesn't transform functions without 'worklet' directive", () => {
@@ -109,10 +113,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).not.toContain('_f.__workletHash');
+    expect(code).not.toContain("_f.__workletHash");
   });
 
-  it('removes comments from worklets', () => {
+  it("removes comments from worklets", () => {
     const input = `
       const f = () => {
         'worklet';
@@ -125,8 +129,8 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).not.toContain('some comment');
-    expect(code).not.toContain('other comment');
+    expect(code).not.toContain("some comment");
+    expect(code).not.toContain("other comment");
   });
 
   it('removes "worklet"; directive from worklets', () => {
@@ -163,10 +167,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('captures worklets environment', () => {
+  it("captures worklets environment", () => {
     const input = `
       const x = 5;
 
@@ -179,7 +183,7 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
   /*
@@ -204,12 +208,12 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
       },
     });
     expect(closureBindings).toEqual([]);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });*/
 
   // functions
 
-  it('workletizes FunctionDeclaration', () => {
+  it("workletizes FunctionDeclaration", () => {
     const input = `
       function foo(x) {
         'worklet';
@@ -218,12 +222,12 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes ArrowFunctionExpression', () => {
+  it("workletizes ArrowFunctionExpression", () => {
     const input = `
       const foo = (x) => {
         'worklet';
@@ -232,12 +236,12 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes unnamed FunctionExpression', () => {
+  it("workletizes unnamed FunctionExpression", () => {
     const input = `
       const foo = function (x) {
         'worklet';
@@ -246,12 +250,12 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes named FunctionExpression', () => {
+  it("workletizes named FunctionExpression", () => {
     const input = `
       const foo = function foo(x) {
         'worklet';
@@ -260,14 +264,14 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
   // class methods
 
-  it('workletizes instance method', () => {
+  it("workletizes instance method", () => {
     const input = `
       class Foo {
         bar(x) {
@@ -278,12 +282,12 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes static method', () => {
+  it("workletizes static method", () => {
     const input = `
       class Foo {
         static bar(x) {
@@ -294,12 +298,12 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes getter', () => {
+  it("workletizes getter", () => {
     const input = `
       class Foo {
         get bar() {
@@ -310,14 +314,14 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
+    expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
   // function hooks
 
-  it('workletizes hook wrapped ArrowFunctionExpression automatically', () => {
+  it("workletizes hook wrapped ArrowFunctionExpression automatically", () => {
     const input = `
       const animatedStyle = useAnimatedStyle(() => ({
         width: 50,
@@ -325,11 +329,11 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes hook wrapped unnamed FunctionExpression automatically', () => {
+  it("workletizes hook wrapped unnamed FunctionExpression automatically", () => {
     const input = `
       const animatedStyle = useAnimatedStyle(function () {
         return {
@@ -339,11 +343,11 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes hook wrapped named FunctionExpression automatically', () => {
+  it("workletizes hook wrapped named FunctionExpression automatically", () => {
     const input = `
       const animatedStyle = useAnimatedStyle(function foo() {
         return {
@@ -353,13 +357,13 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot();
   });
 
   // object hooks
 
-  it.only('workletizes object hook wrapped ArrowFunctionExpression automatically', () => {
+  it.only("workletizes object hook wrapped ArrowFunctionExpression automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: (event) => {
@@ -370,11 +374,26 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     console.log(code);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot(`
+      "\\"use strict\\";
+      useAnimatedGestureHandler({
+          onStart: function() {
+              const _f = function _f(event) {
+                  console.log(event);
+              };
+              _f._closure = {};
+              _f.asString = \\"function _f(event){console.log(event);}\\";
+              _f.__workletHash = 2164830539996;
+              _f.__location = \\"${ process.cwd() }/jest tests fixture (3:17)\\";
+              return _f;
+          }()
+      });
+      "
+    `);
   });
 
-  it('workletizes object hook wrapped unnamed FunctionExpression automatically', () => {
+  it("workletizes object hook wrapped unnamed FunctionExpression automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: function (event) {
@@ -384,11 +403,11 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes object hook wrapped named FunctionExpression automatically', () => {
+  it("workletizes object hook wrapped named FunctionExpression automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: function onStart(event) {
@@ -398,11 +417,11 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('workletizes object hook wrapped ObjectMethod automatically', () => {
+  it("workletizes object hook wrapped ObjectMethod automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart(event) {
@@ -412,11 +431,11 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain('_f.__workletHash');
-    expect(code).toMatchSnapshot();
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('supports empty object in hooks', () => {
+  it("supports empty object in hooks", () => {
     const input = `
       useAnimatedGestureHandler({});
     `;
@@ -424,7 +443,7 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     executeTransform(input);
   });
 
-  it('transforms each object property in hooks', () => {
+  it("transforms each object property in hooks", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: () => {},
@@ -439,7 +458,7 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
 
   // React Native Gesture Handler
 
-  it('workletizes possibly chained gesture object callback functions automatically', () => {
+  it("workletizes possibly chained gesture object callback functions automatically", () => {
     const input = `
       import { Gesture } from 'react-native-gesture-handler';
 
@@ -457,7 +476,7 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
   it("doesn't transform standard callback functions", () => {
@@ -468,10 +487,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('transforms spread operator in worklets for arrays', () => {
+  it("transforms spread operator in worklets for arrays", () => {
     const input = `
       function foo() {
         'worklet';
@@ -481,10 +500,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('transforms spread operator in worklets for objects', () => {
+  it("transforms spread operator in worklets for objects", () => {
     const input = `
       function foo() {
         'worklet';
@@ -494,10 +513,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('transforms spread operator in worklets for function arguments', () => {
+  it("transforms spread operator in worklets for function arguments", () => {
     const input = `
       function foo(...args) {
         'worklet';
@@ -506,10 +525,10 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 
-  it('transforms spread operator in worklets for function calls', () => {
+  it("transforms spread operator in worklets for function calls", () => {
     const input = `
       function foo(arg) {
         'worklet';
@@ -518,6 +537,6 @@ describe.each(transformPresets)('fixture with %s', (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchSnapshot();
+    expect(code).toMatchInlineSnapshot();
   });
 });
