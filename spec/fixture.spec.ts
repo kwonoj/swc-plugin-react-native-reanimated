@@ -23,30 +23,34 @@ const transformPresets: Array<
     (code: string) => ReturnType<typeof import("@swc/core").transformSync>
   ]
 > = [
-    ['plugin', (code: string) => {
-      const opt = { ...options };
-      opt.jsc.experimental = {
-        plugins: [
-          [
-            path.resolve(
-              __dirname,
-              "../target/wasm32-wasi/debug/swc_plugin_reanimated.wasm"
-            ),
-            {},
+    [
+      "plugin",
+      (code: string) => {
+        const opt = { ...options };
+        opt.jsc.experimental = {
+          plugins: [
+            [
+              path.resolve(
+                __dirname,
+                "../target/wasm32-wasi/debug/swc_plugin_reanimated.wasm"
+              ),
+              {},
+            ],
           ],
-        ],
-      }
+        };
 
-      const { transformSync } = require('@swc/core');
-      return transformSync(code, opt)
-    }],
+        const { transformSync } = require("@swc/core");
+        return transformSync(code, opt);
+      },
+    ],
     [
       "custom transform",
       (code: string) => {
         const { transformSync } = require("../index");
         return transformSync(code, true, Buffer.from(JSON.stringify(options)));
       },
-    ],
+    ]
+    ,
   ];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
@@ -363,7 +367,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
   // object hooks
 
-  it("workletizes object hook wrapped ArrowFunctionExpression automatically", () => {
+  it.skip("workletizes object hook wrapped ArrowFunctionExpression automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: (event) => {
@@ -373,7 +377,35 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    console.log(code);
+    expect(code).toContain("_f.__workletHash");
+    expect(code).toMatchInlineSnapshot(`
+    "\\"use strict\\";
+    useAnimatedGestureHandler({
+        onStart: function() {
+            const _f = function _f(event) {
+                console.log(event);
+            };
+            _f._closure = {};
+            _f.asString = \\"function _f(event){console.log(event);}\\";
+            _f.__workletHash = 2164830539996;
+            _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
+            return _f;
+        }()
+    });
+    "
+  `);
+});
+
+  it("workletizes object hook wrapped unnamed FunctionExpression automatically", () => {
+    const input = `
+      useAnimatedGestureHandler({
+        onStart: function (event) {
+          console.log(event);
+        },
+      });
+    `;
+
+    const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).toMatchInlineSnapshot(`
       "\\"use strict\\";
@@ -391,20 +423,6 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
       });
       "
     `);
-  });
-
-  it.skip("workletizes object hook wrapped unnamed FunctionExpression automatically", () => {
-    const input = `
-      useAnimatedGestureHandler({
-        onStart: function (event) {
-          console.log(event);
-        },
-      });
-    `;
-
-    const { code } = executeTransform(input);
-    expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
   });
 
   it.skip("workletizes object hook wrapped named FunctionExpression automatically", () => {
