@@ -19,7 +19,7 @@ use swc_ecmascript::{
 };
 use swc_visit::chain;
 
-// Trying to get an ident from expr. This is for the call_expr's callee,
+// Trying to get an ident from expr. This is for The call_expr's callee,
 // does not cover all of expr cases.
 fn get_callee_expr_ident(expr: &Expr) -> Option<Ident> {
     match expr {
@@ -739,7 +739,9 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         }
     }
 
-    fn process_if_gesture_handler_event_callback_function(&mut self) {
+    fn process_if_gesture_handler_event_callback_function(&mut self, callee: &mut Callee) {
+        if is_gesture_object_event_callback_method(callee) {
+        }
         /*if (
           t.isCallExpression(fun.parent) &&
           isGestureObjectEventCallbackMethod(t, fun.parent.callee)
@@ -818,20 +820,27 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
 impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         if is_gesture_object_event_callback_method(&call_expr.callee) {
-            self.process_if_gesture_handler_event_callback_function();
+            self.process_if_gesture_handler_event_callback_function(&mut call_expr.callee);
         } else {
             self.process_worklets(call_expr);
         }
+
+        call_expr.visit_mut_children_with(self);
     }
 
-    fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {}
+    fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {
+        fn_decl.visit_mut_children_with(self);
+    }
 
     fn visit_mut_fn_expr(&mut self, fn_expr: &mut FnExpr) {
         //processIfWorkletNode(t, path, state);
-        self.process_if_gesture_handler_event_callback_function();
+
+        fn_expr.visit_mut_children_with(self);
     }
 
-    fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {}
+    fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {
+        arrow_expr.visit_mut_children_with(self);
+    }
 }
 
 pub struct WorkletsOptions {
