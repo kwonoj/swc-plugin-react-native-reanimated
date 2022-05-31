@@ -1,4 +1,6 @@
 mod constants;
+use std::path::{Path, PathBuf};
+
 use crate::constants::GLOBALS;
 use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
 use swc_common::{util::take::Take, FileName, SourceMapper, DUMMY_SP};
@@ -118,14 +120,21 @@ struct ReanimatedWorkletsVisitor<S: swc_common::SourceMapper> {
     filename: FileName,
     in_use_animated_style: bool,
     source_map: std::sync::Arc<S>,
+    relative_cwd: Option<PathBuf>,
 }
 
 impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
-    pub fn new(source_map: std::sync::Arc<S>, globals: Vec<String>, filename: FileName) -> Self {
+    pub fn new(
+        source_map: std::sync::Arc<S>,
+        globals: Vec<String>,
+        filename: FileName,
+        relative_cwd: Option<PathBuf>,
+    ) -> Self {
         ReanimatedWorkletsVisitor {
             source_map,
             globals,
             filename,
+            relative_cwd,
             in_use_animated_style: false,
         }
     }
@@ -329,22 +338,27 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
         let location_ident = Ident::new("__location".into(), DUMMY_SP);
 
-        /*        let location = state.file.opts.filename;
-        if (state.opts.relativeSourceLocation) {
-            const path = require('path');
-            location = path.relative(state.cwd, location);
-        }
-
-        const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
-        if (loc) {
-            const { line, column } = loc;
-            if (typeof line === 'number' && typeof column === 'number') {
-            location = `${location} (${line}:${column})`;
-            }
-        } */
+        // Naive approach to calcuate relative path from options.
+        // Note this relies on plugin config option (relative_cwd) to pass specific cwd.
+        // unlike original babel plugin, we can't calculate cwd inside of plugin.
+        // TODO: This is not sound relative path calcuation
+        let filename_str = if let Some(relative_cwd) = &self.relative_cwd {
+            self.filename
+                .to_string()
+                .strip_prefix(
+                    relative_cwd
+                        .as_os_str()
+                        .to_str()
+                        .expect("Should able to convert cwd to string"),
+                )
+                .expect("Should able to strip relative cwd")
+                .to_string()
+        } else {
+            self.filename.to_string()
+        };
 
         let loc = self.source_map.lookup_char_pos(arrow_expr.span.lo);
-        let code_location = format!("{} ({}:{})", self.filename.to_string(), loc.line, loc.col_display);
+        let code_location = format!("{} ({}:{})", filename_str, loc.line, loc.col_display);
 
         // TODO: need to use closuregenerator
         let dummy_closure = Expr::Object(ObjectLit::dummy());
@@ -596,13 +610,19 @@ impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
 pub struct WorkletsOptions {
     custom_globals: Option<Vec<String>>,
     filename: FileName,
+    relative_cwd: Option<PathBuf>,
 }
 
 impl WorkletsOptions {
-    pub fn new(custom_globals: Option<Vec<String>>, filename: FileName) -> Self {
+    pub fn new(
+        custom_globals: Option<Vec<String>>,
+        filename: FileName,
+        relative_cwd: Option<PathBuf>,
+    ) -> Self {
         WorkletsOptions {
             custom_globals,
             filename,
+            relative_cwd,
         }
     }
 }
@@ -618,5 +638,10 @@ pub fn create_worklets_visitor<S: SourceMapper>(
         globals_vec.extend(custom_globals);
     };
 
-    ReanimatedWorkletsVisitor::new(source_map, globals_vec, worklets_options.filename)
+    ReanimatedWorkletsVisitor::new(
+        source_map,
+        globals_vec,
+        worklets_options.filename,
+        worklets_options.relative_cwd,
+    )
 }
