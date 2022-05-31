@@ -91,9 +91,8 @@ pub fn transform_sync(s: String, _is_module: bool, opts: Buffer) -> napi::Result
                     &options,
                     |_program, _comments| {
                         as_folder(create_worklets_visitor(
-                            WorkletsOptions::new(None, filename.clone()),
+                            WorkletsOptions::new(None, filename.clone(), None),
                             c.cm.clone(),
-                            None,
                         ))
                     },
                     |_, _| noop(),
