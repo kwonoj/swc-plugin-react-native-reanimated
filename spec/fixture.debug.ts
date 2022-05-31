@@ -51,10 +51,10 @@ const transformPresets: Array<
   ];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
-  it("workletizes object hook wrapped unnamed FunctionExpression automatically", () => {
+  it("workletizes object hook wrapped ObjectMethod automatically", () => {
     const input = `
       useAnimatedGestureHandler({
-        onStart: function (event) {
+        onStart(event) {
           console.log(event);
         },
       });
