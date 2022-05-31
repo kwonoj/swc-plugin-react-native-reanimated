@@ -733,6 +733,15 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             _ => {}
         }
     }
+
+    fn process_if_gesture_handler_event_callback_function(&mut self) {
+        /*if (
+            t.isCallExpression(fun.parent) &&
+            isGestureObjectEventCallbackMethod(t, fun.parent.callee)
+          ) {
+            processWorkletFunction(t, fun, state);
+          }*/
+    }
 }
 
 impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
@@ -742,7 +751,10 @@ impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
 
     fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {}
 
-    fn visit_mut_fn_expr(&mut self, fn_expr: &mut FnExpr) {}
+    fn visit_mut_fn_expr(&mut self, fn_expr: &mut FnExpr) {
+        //processIfWorkletNode(t, path, state);
+        self.process_if_gesture_handler_event_callback_function();
+    }
 
     fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {}
 }
