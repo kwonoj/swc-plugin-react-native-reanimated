@@ -6,7 +6,7 @@ use constants::{
     FUNCTIONLESS_FLAG, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION,
     STATEMENTLESS_FLAG,
 };
-use swc_common::{util::take::Take, FileName, SourceMapper, DUMMY_SP};
+use swc_common::{util::take::Take, FileName, SourceMapper, Span, DUMMY_SP};
 use swc_ecma_codegen::{self, text_writer::WriteJs, Emitter, Node};
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
@@ -182,7 +182,9 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         todo!("not implemented");
     }
 
-    fn build_worklet_string(&mut self, mut transformed: ArrowExpr, fn_name: Ident) -> String {
+    /// Print givne fn's string with writer.
+    /// This should be called with `cloned` node, as internally this'll take ownership.
+    fn build_worklet_string(&mut self, fn_name: Ident, expr: Expr) -> String {
         /*
         function prependClosureVariablesIfNecessary(closureVariables, body) {
             if (closureVariables.length === 0) {
@@ -227,7 +229,24 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
           return generate(workletFunction, { compact: true }).code;
          */
 
-        let body = match transformed.body.take() {
+        let (params, body) = match expr {
+            Expr::Arrow(mut arrow_expr) => (
+                arrow_expr.params.drain(..).map(Param::from).collect(),
+                arrow_expr.body,
+            ),
+            Expr::Fn(fn_expr) => (
+                fn_expr.function.params,
+                BlockStmtOrExpr::BlockStmt(
+                    fn_expr
+                        .function
+                        .body
+                        .expect("Expect fn body exists to make worklet fn"),
+                ),
+            ),
+            _ => todo!("unexpected"),
+        };
+
+        let body = match body {
             BlockStmtOrExpr::BlockStmt(body) => body,
             BlockStmtOrExpr::Expr(e) => BlockStmt {
                 stmts: vec![Stmt::Expr(ExprStmt {
@@ -241,7 +260,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         let transformed_function = FnExpr {
             ident: Some(fn_name),
             function: Function {
-                params: transformed.params.drain(..).map(Param::from).collect(),
+                params,
                 body: Some(body),
                 ..Function::dummy()
             },
@@ -418,7 +437,20 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         Function { ..function.take() }
     }
 
-    fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
+    /// Actual fn to generate AST for worklet-ized function to be called across
+    /// fn-like nodes (arrow fn, fnExpr)
+    fn make_worklet_inner(
+        &mut self,
+        mut cloned: Expr,
+        span: &Span,
+        mut body: BlockStmtOrExpr,
+        params: Vec<Param>,
+        is_generator: bool,
+        is_async: bool,
+        type_params: Option<TsTypeParamDecl>,
+        return_type: Option<TsTypeAnn>,
+        decorators: Option<Vec<Decorator>>,
+    ) -> Function {
         /*
         const privateFunctionId = t.identifier('_f');
         const clone = t.cloneNode(fun.node);
@@ -452,12 +484,9 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             );
         }
         */
-
         // TODO: consolidate into make_worklet_name
         let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
 
-        // Have to clone to run transform preprocessor without changing original codes
-        let mut cloned_code = arrow_expr.clone();
         /*
          const code = '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
         */
@@ -474,9 +503,9 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             nullish_coalescing(Default::default()),
             template_literal(Default::default())
         );
-        cloned_code.visit_mut_with(&mut preprocessor);
+        cloned.visit_mut_with(&mut preprocessor);
 
-        let func_string = self.build_worklet_string(cloned_code, dummy_fn_name.clone());
+        let func_string = self.build_worklet_string(dummy_fn_name.clone(), cloned);
         let func_hash = calculate_hash(&func_string);
 
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
@@ -503,24 +532,30 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             self.filename.to_string()
         };
 
-        let loc = self.source_map.lookup_char_pos(arrow_expr.span.lo);
+        let loc = self.source_map.lookup_char_pos(span.lo);
         let code_location = format!("{} ({}:{})", filename_str, loc.line, loc.col_display);
 
         // TODO: need to use closuregenerator
         let dummy_closure = Expr::Object(ObjectLit::dummy());
 
-        let func_expr = match arrow_expr.body.take() {
+        let decorators = if let Some(decorators) = decorators {
+            decorators
+        } else {
+            Default::default()
+        };
+
+        let func_expr = match body.take() {
             BlockStmtOrExpr::BlockStmt(body) => Expr::Fn(FnExpr {
                 ident: Some(dummy_fn_name.clone()),
                 function: Function {
-                    params: arrow_expr.params.drain(..).map(Param::from).collect(),
-                    decorators: Default::default(),
+                    params,
+                    decorators,
                     span: DUMMY_SP,
                     body: Some(body),
-                    is_generator: arrow_expr.is_generator,
-                    is_async: arrow_expr.is_async,
-                    type_params: arrow_expr.type_params.take(),
-                    return_type: arrow_expr.return_type.take(),
+                    is_generator,
+                    is_async,
+                    type_params,
+                    return_type,
                 },
             }),
             BlockStmtOrExpr::Expr(e) => *e,
@@ -616,15 +651,44 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         };
 
         Function {
-            params: Default::default(),
-            decorators: Default::default(),
-            span: DUMMY_SP,
             body: Some(body),
-            is_generator: arrow_expr.is_generator,
-            is_async: arrow_expr.is_async,
-            type_params: arrow_expr.type_params.take(),
-            return_type: arrow_expr.return_type.take(),
+            ..Function::dummy()
         }
+    }
+
+    fn make_worklet_from_fn_expr(&mut self, fn_expr: &mut FnExpr) -> Function {
+        self.make_worklet_inner(
+            // Have to clone to run transform preprocessor without changing original codes
+            Expr::Fn(fn_expr.clone()),
+            &fn_expr.function.span,
+            BlockStmtOrExpr::BlockStmt(
+                fn_expr
+                    .function
+                    .body
+                    .take()
+                    .expect("Expect fn body exists to make worklet fn"),
+            ),
+            fn_expr.function.params.take(),
+            fn_expr.function.is_generator,
+            fn_expr.function.is_async,
+            fn_expr.function.type_params.take(),
+            fn_expr.function.return_type.take(),
+            Some(fn_expr.function.decorators.take()),
+        )
+    }
+
+    fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
+        self.make_worklet_inner(
+            Expr::Arrow(arrow_expr.clone()),
+            &arrow_expr.span,
+            arrow_expr.body.take(),
+            arrow_expr.params.drain(..).map(Param::from).collect(),
+            arrow_expr.is_generator,
+            arrow_expr.is_async,
+            arrow_expr.type_params.take(),
+            arrow_expr.return_type.take(),
+            None,
+        )
     }
 
     fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
@@ -656,26 +720,6 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
     }
 
     fn process_worklet_function(&mut self, fn_like_expr: &mut Expr) {
-        /*
-          const newFun = makeWorklet(t, fun, state);
-
-        const replacement = t.callExpression(newFun, []);
-
-        // we check if function needs to be assigned to variable declaration.
-        // This is needed if function definition directly in a scope. Some other ways
-        // where function definition can be used is for example with variable declaration:
-        // const ggg = function foo() { }
-        // ^ in such a case we don't need to define variable for the function
-        const needDeclaration =
-            t.isScopable(fun.parent) || t.isExportNamedDeclaration(fun.parent);
-        fun.replaceWith(
-            fun.node.id && needDeclaration
-            ? t.variableDeclaration('const', [
-                t.variableDeclarator(fun.node.id, replacement),
-                ])
-            : replacement
-        );
-        */
         match fn_like_expr {
             Expr::Arrow(arrow_expr) => {
                 let fn_expr = self.make_worklet_from_arrow(arrow_expr);
@@ -688,7 +732,19 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
                     ..CallExpr::dummy()
                 });
             }
-            Expr::Fn(fn_expr) => {}
+            Expr::Fn(fn_expr) => {
+                // TODO: do we need to care about if fn body is empty?
+                if fn_expr.function.body.is_some() {
+                    let fn_expr = self.make_worklet_from_fn_expr(fn_expr);
+                    *fn_like_expr = Expr::Call(CallExpr {
+                        callee: Callee::Expr(Box::new(Expr::Fn(FnExpr {
+                            ident: Default::default(),
+                            function: fn_expr,
+                        }))),
+                        ..CallExpr::dummy()
+                    });
+                }
+            }
             _ => {}
         }
     }
@@ -740,8 +796,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
     }
 
     fn process_if_gesture_handler_event_callback_function(&mut self, callee: &mut Callee) {
-        if is_gesture_object_event_callback_method(callee) {
-        }
+        if is_gesture_object_event_callback_method(callee) {}
         /*if (
           t.isCallExpression(fun.parent) &&
           isGestureObjectEventCallbackMethod(t, fun.parent.callee)
