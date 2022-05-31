@@ -32,6 +32,7 @@
     "build:customtransform": "napi build --platform --cargo-cwd ./spec/swc-reanimated-custom-transform",
     "build:plugin": "cargo build -p swc-plugin-reanimated --target wasm32-wasi",
     "test": "npm-run-all build:all && jest",
+    "test:debug": "npm-run-all build:all && jest --testMatch=\"**/?(*.)+(debug).[tj]s?(x)\"",
     "prepare": "husky install"
   },
   "repository": {
