@@ -1,7 +1,7 @@
 mod constants;
 use crate::constants::GLOBALS;
 use constants::{FUNCTIONLESS_FLAG, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG};
-use swc_common::{util::take::Take, FileName, DUMMY_SP};
+use swc_common::{util::take::Take, FileName, SourceMapper, DUMMY_SP};
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
     es2020::{nullish_coalescing, optional_chaining},
@@ -113,15 +113,17 @@ impl Visit for ClosureIdentVisitor {
     fn visit_assign_expr(&mut self, assign_expr: &AssignExpr) {}
 }
 
-struct ReanimatedWorkletsVisitor {
+struct ReanimatedWorkletsVisitor<S: swc_common::SourceMapper> {
     globals: Vec<String>,
     filename: FileName,
     in_use_animated_style: bool,
+    source_map: std::sync::Arc<S>,
 }
 
-impl ReanimatedWorkletsVisitor {
-    pub fn new(globals: Vec<String>, filename: FileName) -> Self {
+impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
+    pub fn new(source_map: std::sync::Arc<S>, globals: Vec<String>, filename: FileName) -> Self {
         ReanimatedWorkletsVisitor {
+            source_map,
             globals,
             filename,
             in_use_animated_style: false,
@@ -327,22 +329,22 @@ impl ReanimatedWorkletsVisitor {
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
         let location_ident = Ident::new("__location".into(), DUMMY_SP);
 
+        /*        let location = state.file.opts.filename;
+        if (state.opts.relativeSourceLocation) {
+            const path = require('path');
+            location = path.relative(state.cwd, location);
+        }
 
-            /*        let location = state.file.opts.filename;
-            if (state.opts.relativeSourceLocation) {
-                const path = require('path');
-                location = path.relative(state.cwd, location);
+        const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
+        if (loc) {
+            const { line, column } = loc;
+            if (typeof line === 'number' && typeof column === 'number') {
+            location = `${location} (${line}:${column})`;
             }
+        } */
 
-            const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
-            if (loc) {
-                const { line, column } = loc;
-                if (typeof line === 'number' && typeof column === 'number') {
-                location = `${location} (${line}:${column})`;
-                }
-            } */
-
-        let code_location = self.filename.to_string();
+        let loc = self.source_map.lookup_char_pos(arrow_expr.span.lo);
+        let code_location = format!("{} ({}:{})", self.filename.to_string(), loc.line, loc.col_display);
 
         // TODO: need to use closuregenerator
         let dummy_closure = Expr::Object(ObjectLit::dummy());
@@ -579,7 +581,7 @@ impl ReanimatedWorkletsVisitor {
     }
 }
 
-impl VisitMut for ReanimatedWorkletsVisitor {
+impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         self.process_worklets(call_expr);
     }
@@ -605,7 +607,10 @@ impl WorkletsOptions {
     }
 }
 
-pub fn create_worklets_visitor(worklets_options: WorkletsOptions) -> impl VisitMut {
+pub fn create_worklets_visitor<S: SourceMapper>(
+    worklets_options: WorkletsOptions,
+    source_map: std::sync::Arc<S>,
+) -> impl VisitMut {
     let mut globals_vec = GLOBALS.map(|v| v.to_string()).to_vec();
 
     // allows adding custom globals such as host-functions
@@ -613,5 +618,5 @@ pub fn create_worklets_visitor(worklets_options: WorkletsOptions) -> impl VisitM
         globals_vec.extend(custom_globals);
     };
 
-    ReanimatedWorkletsVisitor::new(globals_vec, worklets_options.filename)
+    ReanimatedWorkletsVisitor::new(source_map, globals_vec, worklets_options.filename)
 }
