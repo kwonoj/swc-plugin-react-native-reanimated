@@ -197,7 +197,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).not.toContain("'worklet';");
   });
 
-  it.skip("doesn't transform string literals", () => {
+  it("doesn't transform string literals", () => {
     const input = `
       function foo(x) {
         'worklet';
@@ -208,18 +208,21 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f(x) {
-        var bar = 'worklet';
-        var baz = \\"worklet\\";
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function foo(x){const bar='worklet';const baz=\\\\\\"worklet\\\\\\";}\\";
-      _f.__workletHash = 9810417751380;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(x) {
+              ;
+              const bar = 'worklet';
+              // prettier-ignore
+              const baz = \\"worklet\\";
+          };
+          _f._closure = {};
+          _f.asString = 'function foo(x){;const bar=\\"worklet\\";const baz=\\"worklet\\";}';
+          _f.__workletHash = 2809676670;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
@@ -330,7 +333,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("workletizes ArrowFunctionExpression", () => {
+  it("workletizes ArrowFunctionExpression", () => {
     const input = `
       const foo = (x) => {
         'worklet';
@@ -342,17 +345,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f(x) {
-        return x + 2;
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function _f(x){return x+2;}\\";
-      _f.__workletHash = 11411090164019;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(x) {
+              ;
+              return x + 2;
+          };
+          _f._closure = {};
+          _f.asString = \\"function _f(x){;return x+2;}\\";
+          _f.__workletHash = 3611478349;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+          return _f;
+      }();
+      "
     `);
   });
 

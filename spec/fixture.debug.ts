@@ -51,31 +51,47 @@ const transformPresets: Array<
 ];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
-  it("workletizes named FunctionExpression", () => {
+  it("workletizes instance method", () => {
     const input = `
-      const foo = function foo(x) {
-        'worklet';
-        return x + 2;
-      };
+      class Foo {
+        bar(x) {
+          'worklet';
+          return x + 2;
+        }
+      }
     `;
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
-      "\\"use strict\\";
-      const foo = function() {
-          const _f = function _f(x) {
-              ;
-              return x + 2;
+    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
+
+    var _classCallCheck2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/classCallCheck\\"));
+
+    var _createClass2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/createClass\\"));
+
+    var Foo = function () {
+      function Foo() {
+        (0, _classCallCheck2.default)(this, Foo);
+      }
+
+      (0, _createClass2.default)(Foo, [{
+        key: \\"bar\\",
+        value: function () {
+          var _f = function _f(x) {
+            return x + 2;
           };
+
           _f._closure = {};
-          _f.asString = \\"function foo(x){;return x+2;}\\";
-          _f.__workletHash = 3611478349;
-          _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+          _f.asString = \\"function bar(x){return x+2;}\\";
+          _f.__workletHash = 16974800582491;
+          _f.__location = \\"${process.cwd()}/jest tests fixture\\";
           return _f;
-      }();
-      "
+        }()
+      }]);
+      return Foo;
+    }();"
     `);
   });
 });
