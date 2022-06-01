@@ -314,17 +314,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f(x) {
-        return x + 2;
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function foo(x){return x+2;}\\";
-      _f.__workletHash = 4679479961836;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(x) {
+              ;
+              return x + 2;
+          };
+          _f._closure = {};
+          _f.asString = \\"function foo(x){;return x+2;}\\";
+          _f.__workletHash = 3611478349;
+          _f.__location = \\"${ process.cwd() }/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
@@ -354,7 +356,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("workletizes unnamed FunctionExpression", () => {
+  it("workletizes unnamed FunctionExpression", () => {
     const input = `
       const foo = function (x) {
         'worklet';
@@ -366,17 +368,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f(x) {
-        return x + 2;
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function _f(x){return x+2;}\\";
-      _f.__workletHash = 11411090164019;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(x) {
+              ;
+              return x + 2;
+          };
+          _f._closure = {};
+          _f.asString = \\"function _f(x){;return x+2;}\\";
+          _f.__workletHash = 3611478349;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
@@ -392,17 +396,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f(x) {
-        return x + 2;
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function foo(x){return x+2;}\\";
-      _f.__workletHash = 4679479961836;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(x) {
+              ;
+              return x + 2;
+          };
+          _f._closure = {};
+          _f.asString = \\"function foo(x){;return x+2;}\\";
+          _f.__workletHash = 3611478349;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
