@@ -62,36 +62,25 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
+
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
-    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
-
-    var _classCallCheck2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/classCallCheck\\"));
-
-    var _createClass2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/createClass\\"));
-
-    var Foo = function () {
-      function Foo() {
-        (0, _classCallCheck2.default)(this, Foo);
+      "\\"use strict\\";
+      class Foo {
+          bar() {
+              const _f = function _f(x) {
+                  ;
+                  return x + 2;
+              };
+              _f._closure = {};
+              _f.asString = \\"function bar(x){;return x+2;}\\";
+              _f.__workletHash = 2790860375;
+              _f.__location = \\"/home/ojkwon/github_oracle/swc-plugin-react-native-reanimated/jest tests fixture (3:8)\\";
+              return _f;
+          }
       }
-
-      (0, _createClass2.default)(Foo, [{
-        key: \\"bar\\",
-        value: function () {
-          var _f = function _f(x) {
-            return x + 2;
-          };
-
-          _f._closure = {};
-          _f.asString = \\"function bar(x){return x+2;}\\";
-          _f.__workletHash = 16974800582491;
-          _f.__location = \\"${process.cwd()}/jest tests fixture\\";
-          return _f;
-        }()
-      }]);
-      return Foo;
-    }();"
+      "
     `);
   });
 });

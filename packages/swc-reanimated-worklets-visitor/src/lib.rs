@@ -100,6 +100,10 @@ impl Visit for OptimizationFinderVisitor {
     }
 }
 
+/// Locate `'worklet';` directives and performs necessary transformation
+/// if directive found.
+/// - Removes comments explicitly
+/// - Removes `worklet`; directive itself
 struct DirectiveFinderVisitor<C: Clone + swc_common::comments::Comments> {
     pub has_worklet_directive: bool,
     in_fn_parent_node: bool,
@@ -548,7 +552,6 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         };
         let private_fn_name = Ident::new("_f".into(), DUMMY_SP);
 
-
         /*
          const code = '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
         */
@@ -812,7 +815,8 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
 
     fn process_worklet_fn_decl(&mut self, decl: &mut Decl) {
         if let Decl::Fn(fn_decl) = decl {
-            let worklet_fn = self.make_worklet_from_fn(&mut Some(fn_decl.ident.clone()), &mut fn_decl.function);
+            let worklet_fn =
+                self.make_worklet_from_fn(&mut Some(fn_decl.ident.clone()), &mut fn_decl.function);
 
             let declarator = VarDeclarator {
                 name: Pat::Ident(BindingIdent::from(fn_decl.ident.take())),
@@ -1014,6 +1018,24 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> Vis
                 self.process_if_fn_decl_worklet_node(decl);
                 if self.in_gesture_handler_event_callback {
                     self.process_worklet_fn_decl(decl);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Note we do not transform class method itself - it should be performed by core transform instead
+    fn visit_mut_class_method(&mut self, class_method: &mut ClassMethod) {
+        match &mut class_method.key {
+            PropName::Ident(ident) => {
+                let mut visitor = DirectiveFinderVisitor::new(self.comments.clone());
+                class_method.function.visit_mut_children_with(&mut visitor);
+
+                // TODO: consolidate with process_if_fn_decl_worklet_node
+                if visitor.has_worklet_directive {
+                    let worklet_fn =
+                        self.make_worklet_from_fn(&mut Some(ident.clone()), &mut class_method.function);
+                    class_method.function = worklet_fn;
                 }
             }
             _ => {}
