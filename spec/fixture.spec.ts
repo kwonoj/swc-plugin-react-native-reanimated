@@ -145,7 +145,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).toContain("_closure");
   });
 
-  it.skip("doesn't transform functions without 'worklet' directive", () => {
+  it("doesn't transform functions without 'worklet' directive", () => {
     const input = `
       function f(x) {
         return x + 2;
@@ -821,7 +821,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("doesn't transform standard callback functions", () => {
+  it("doesn't transform standard callback functions", () => {
     const input = `
       const foo = Something.Tap().onEnd((_event, _success) => {
         console.log('onEnd');
@@ -830,9 +830,11 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toMatchInlineSnapshot(`
-    "var foo = Something.Tap().onEnd(function (_event, _success) {
-      console.log('onEnd');
-    });"
+      "\\"use strict\\";
+      const foo = Something.Tap().onEnd((_event, _success)=>{
+          console.log('onEnd');
+      });
+      "
     `);
   });
 
