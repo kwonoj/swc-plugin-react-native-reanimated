@@ -496,6 +496,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
     /// fn-like nodes (arrow fn, fnExpr)
     fn make_worklet_inner(
         &mut self,
+        worklet_name: Option<Ident>,
         mut cloned: Expr,
         span: &Span,
         mut body: BlockStmtOrExpr,
@@ -539,8 +540,14 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
             );
         }
         */
-        // TODO: consolidate into make_worklet_name
-        let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
+
+        let function_name = if let Some(ident) = worklet_name {
+            ident
+        } else {
+            Ident::new("_f".into(), DUMMY_SP)
+        };
+        let private_fn_name = Ident::new("_f".into(), DUMMY_SP);
+
 
         /*
          const code = '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
@@ -560,7 +567,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         );
         cloned.visit_mut_with(&mut preprocessor);
 
-        let func_string = self.build_worklet_string(dummy_fn_name.clone(), cloned);
+        let func_string = self.build_worklet_string(function_name.clone(), cloned);
         let func_hash = calculate_hash(&func_string);
 
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
@@ -601,7 +608,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
 
         let func_expr = match body.take() {
             BlockStmtOrExpr::BlockStmt(body) => Expr::Fn(FnExpr {
-                ident: Some(dummy_fn_name.clone()),
+                ident: Some(private_fn_name.clone()),
                 function: Function {
                     params,
                     decorators,
@@ -626,7 +633,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                 decls: vec![VarDeclarator {
                     span: DUMMY_SP,
                     definite: false,
-                    name: Pat::Ident(BindingIdent::from(dummy_fn_name.clone())),
+                    name: Pat::Ident(BindingIdent::from(private_fn_name.clone())),
                     init: Some(Box::new(func_expr)),
                 }],
             })),
@@ -638,7 +645,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                     op: AssignOp::Assign,
                     left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        obj: Box::new(Expr::Ident(private_fn_name.clone())),
                         prop: MemberProp::Ident(closure_ident.clone()),
                     }))),
                     // TODO: this is not complete
@@ -653,7 +660,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                     op: AssignOp::Assign,
                     left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        obj: Box::new(Expr::Ident(private_fn_name.clone())),
                         prop: MemberProp::Ident(as_string_ident.clone()),
                     }))),
                     // TODO: this is not complete
@@ -668,7 +675,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                     op: AssignOp::Assign,
                     left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        obj: Box::new(Expr::Ident(private_fn_name.clone())),
                         prop: MemberProp::Ident(worklet_hash_ident.clone()),
                     }))),
                     // TODO: this is not complete
@@ -687,7 +694,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                     op: AssignOp::Assign,
                     left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
                         span: DUMMY_SP,
-                        obj: Box::new(Expr::Ident(dummy_fn_name.clone())),
+                        obj: Box::new(Expr::Ident(private_fn_name.clone())),
                         prop: MemberProp::Ident(location_ident.clone()),
                     }))),
                     right: Box::new(Expr::Lit(Lit::Str(Str::from(code_location)))),
@@ -697,7 +704,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
 
         stmts.push(Stmt::Return(ReturnStmt {
             span: DUMMY_SP,
-            arg: Some(Box::new(Expr::Ident(dummy_fn_name))),
+            arg: Some(Box::new(Expr::Ident(private_fn_name))),
         }));
 
         let body = BlockStmt {
@@ -717,6 +724,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         function: &mut Function,
     ) -> Function {
         self.make_worklet_inner(
+            ident.clone(),
             // Have to clone to run transform preprocessor without changing original codes
             Expr::Fn(FnExpr {
                 ident: ident.take(),
@@ -744,6 +752,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
 
     fn make_worklet_from_arrow(&mut self, arrow_expr: &mut ArrowExpr) -> Function {
         self.make_worklet_inner(
+            None,
             Expr::Arrow(arrow_expr.clone()),
             &arrow_expr.span,
             arrow_expr.body.take(),
@@ -803,7 +812,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
 
     fn process_worklet_fn_decl(&mut self, decl: &mut Decl) {
         if let Decl::Fn(fn_decl) = decl {
-            let worklet_fn = self.make_worklet_from_fn(&mut None, &mut fn_decl.function);
+            let worklet_fn = self.make_worklet_from_fn(&mut Some(fn_decl.ident.clone()), &mut fn_decl.function);
 
             let declarator = VarDeclarator {
                 name: Pat::Ident(BindingIdent::from(fn_decl.ident.take())),
