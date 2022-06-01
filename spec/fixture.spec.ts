@@ -433,7 +433,6 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
 
-    console.log(code);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
@@ -721,7 +720,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("workletizes object hook wrapped ObjectMethod automatically", () => {
+  it("workletizes object hook wrapped ObjectMethod automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart(event) {
@@ -741,7 +740,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
               };
               _f._closure = {};
               _f.asString = \\"function onStart(event){console.log(event);}\\";
-              _f.__workletHash = 4276664511;
+              _f.__workletHash = 1675048407;
               _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
               return _f;
           }

@@ -798,7 +798,14 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         if let Some(key) = key {
             let function = if let PropOrSpread::Prop(prop) = method_prop {
                 if let Prop::Method(MethodProp { function, .. }) = &mut **prop {
-                    Some(self.make_worklet_from_fn(&mut None, function))
+                    // TODO: handle rest of proname enum
+                    let mut fn_ident = if let PropName::Ident(i) = &key {
+                        Some(i.clone())
+                    } else {
+                        None
+                    };
+
+                    Some(self.make_worklet_from_fn(&mut fn_ident, function))
                 } else {
                     None
                 }
@@ -807,8 +814,13 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
             };
 
             if let Some(function) = function {
-                *method_prop =
-                    PropOrSpread::Prop(Box::new(Prop::Method(MethodProp { key, function })));
+                *method_prop = PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                    key,
+                    value: Box::new(Expr::Fn(FnExpr {
+                        function,
+                        ..FnExpr::dummy()
+                    })),
+                })));
             }
         }
     }
@@ -1033,8 +1045,8 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> Vis
 
                 // TODO: consolidate with process_if_fn_decl_worklet_node
                 if visitor.has_worklet_directive {
-                    let worklet_fn =
-                        self.make_worklet_from_fn(&mut Some(ident.clone()), &mut class_method.function);
+                    let worklet_fn = self
+                        .make_worklet_from_fn(&mut Some(ident.clone()), &mut class_method.function);
                     class_method.function = worklet_fn;
                 }
             }
