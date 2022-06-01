@@ -51,35 +51,31 @@ const transformPresets: Array<
 ];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
-  it("workletizes instance method", () => {
+  it("workletizes object hook wrapped ObjectMethod automatically", () => {
     const input = `
-      class Foo {
-        bar(x) {
-          'worklet';
-          return x + 2;
-        }
-      }
+      useAnimatedGestureHandler({
+        onStart(event) {
+          console.log(event);
+        },
+      });
     `;
 
     const { code } = executeTransform(input);
-
     expect(code).toContain("_f.__workletHash");
-    expect(code).not.toContain('\\"worklet\\";');
     expect(code).toMatchInlineSnapshot(`
       "\\"use strict\\";
-      class Foo {
-          bar() {
-              const _f = function _f(x) {
-                  ;
-                  return x + 2;
+      useAnimatedGestureHandler({
+          onStart: function() {
+              const _f = function _f(event) {
+                  console.log(event);
               };
               _f._closure = {};
-              _f.asString = \\"function bar(x){;return x+2;}\\";
-              _f.__workletHash = 2790860375;
-              _f.__location = \\"/home/ojkwon/github_oracle/swc-plugin-react-native-reanimated/jest tests fixture (3:8)\\";
+              _f.asString = \\"function onStart(event){console.log(event);}\\";
+              _f.__workletHash = 4276664511;
+              _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
               return _f;
           }
-      }
+      });
       "
     `);
   });

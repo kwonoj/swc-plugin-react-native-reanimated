@@ -692,7 +692,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("workletizes object hook wrapped named FunctionExpression automatically", () => {
+  it("workletizes object hook wrapped named FunctionExpression automatically", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: function onStart(event) {
@@ -704,19 +704,20 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).toMatchInlineSnapshot(`
-    "useAnimatedGestureHandler({
-      onStart: function () {
-        var _f = function _f(event) {
-          console.log(event);
-        };
-
-        _f._closure = {};
-        _f.asString = \\"function onStart(event){console.log(event);}\\";
-        _f.__workletHash = 338158776260;
-        _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
-        return _f;
-      }()
-    });"
+      "\\"use strict\\";
+      useAnimatedGestureHandler({
+          onStart: function() {
+              const _f = function _f(event) {
+                  console.log(event);
+              };
+              _f._closure = {};
+              _f.asString = \\"function onStart(event){console.log(event);}\\";
+              _f.__workletHash = 1675048407;
+              _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
+              return _f;
+          }()
+      });
+      "
     `);
   });
 
@@ -732,19 +733,20 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).toMatchInlineSnapshot(`
-    "useAnimatedGestureHandler({
-      onStart: function () {
-        var _f = function _f(event) {
-          console.log(event);
-        };
-
-        _f._closure = {};
-        _f.asString = \\"function onStart(event){console.log(event);}\\";
-        _f.__workletHash = 338158776260;
-        _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
-        return _f;
-      }()
-    });"
+      "\\"use strict\\";
+      useAnimatedGestureHandler({
+          onStart: function() {
+              const _f = function _f(event) {
+                  console.log(event);
+              };
+              _f._closure = {};
+              _f.asString = \\"function onStart(event){console.log(event);}\\";
+              _f.__workletHash = 4276664511;
+              _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
+              return _f;
+          }
+      });
+      "
     `);
   });
 
