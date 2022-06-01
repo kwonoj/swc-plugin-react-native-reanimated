@@ -156,7 +156,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).not.toContain("_f.__workletHash");
   });
 
-  it.skip("removes comments from worklets", () => {
+  it("removes comments from worklets", () => {
     const input = `
       const f = () => {
         'worklet';
