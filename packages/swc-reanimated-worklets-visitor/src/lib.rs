@@ -136,6 +136,8 @@ impl<C: Clone + swc_common::comments::Comments> VisitMut for DirectiveFinderVisi
             if let Expr::Lit(Lit::Str(Str { value, .. })) = &**expr {
                 if &*value == "worklet" {
                     self.has_worklet_directive = true;
+                    // remove 'worklet'; directive before calling .toString()
+                    *stmt = Stmt::dummy();
                 }
             }
         }
@@ -154,9 +156,6 @@ impl<C: Clone + swc_common::comments::Comments> VisitMut for DirectiveFinderVisi
                 }
                 _ => {}
             };
-
-            // remove 'worklet'; directive before calling .toString()
-            *stmt = Stmt::dummy();
         }
     }
 }
@@ -757,11 +756,11 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         )
     }
 
-    fn process_if_fn_decl_worklet_node(&mut self, fn_decl: &mut FnDecl) {
+    fn process_if_fn_decl_worklet_node(&mut self, decl: &mut Decl) {
         let mut visitor = DirectiveFinderVisitor::new(self.comments.clone());
-        fn_decl.visit_mut_children_with(&mut visitor);
+        decl.visit_mut_children_with(&mut visitor);
         if visitor.has_worklet_directive {
-            self.process_worklet_fn_decl(fn_decl);
+            self.process_worklet_fn_decl(decl);
         }
     }
 
@@ -802,8 +801,28 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         }
     }
 
-    fn process_worklet_fn_decl(&mut self, fn_decl: &mut FnDecl) {
+    fn process_worklet_fn_decl(&mut self, decl: &mut Decl) {
+        if let Decl::Fn(fn_decl) = decl {
+            let worklet_fn = self.make_worklet_from_fn(&mut None, &mut fn_decl.function);
 
+            let declarator = VarDeclarator {
+                name: Pat::Ident(BindingIdent::from(fn_decl.ident.take())),
+                init: Some(Box::new(Expr::Call(CallExpr {
+                    callee: Callee::Expr(Box::new(Expr::Fn(FnExpr {
+                        ident: None,
+                        function: worklet_fn,
+                    }))),
+                    ..CallExpr::dummy()
+                }))),
+                ..VarDeclarator::dummy()
+            };
+
+            *decl = Decl::Var(VarDecl {
+                kind: VarDeclKind::Const,
+                decls: vec![declarator],
+                ..VarDecl::dummy()
+            });
+        }
     }
 
     // TODO: consolidate with process_worklet_fn_decl
@@ -978,13 +997,18 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> Vis
         }
     }
 
-    fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {
-        fn_decl.visit_mut_children_with(self);
+    fn visit_mut_decl(&mut self, decl: &mut Decl) {
+        decl.visit_mut_children_with(self);
 
-        self.process_if_fn_decl_worklet_node(fn_decl);
-        /*if self.in_gesture_handler_event_callback {
-            self.process_worklet_function(expr);
-        }*/
+        match decl {
+            Decl::Fn(..) => {
+                self.process_if_fn_decl_worklet_node(decl);
+                if self.in_gesture_handler_event_callback {
+                    self.process_worklet_fn_decl(decl);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn visit_mut_expr(&mut self, expr: &mut Expr) {
