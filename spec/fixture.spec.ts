@@ -173,7 +173,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).not.toContain("other comment");
   });
 
-  it.skip('removes "worklet"; directive from worklets', () => {
+  it('removes "worklet"; directive from worklets', () => {
     const input = `
       function foo(x) {
         "worklet"; // prettier-ignore
@@ -185,7 +185,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     expect(code).not.toContain('\\"worklet\\";');
   });
 
-  it.skip("removes 'worklet'; directive from worklets", () => {
+  it("removes 'worklet'; directive from worklets", () => {
     const input = `
       function foo(x) {
         'worklet'; // prettier-ignore

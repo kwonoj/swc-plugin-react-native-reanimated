@@ -757,6 +757,15 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         )
     }
 
+    fn process_if_fn_decl_worklet_node(&mut self, fn_decl: &mut FnDecl) {
+        let mut visitor = DirectiveFinderVisitor::new(self.comments.clone());
+        fn_decl.visit_mut_children_with(&mut visitor);
+        if visitor.has_worklet_directive {
+            self.process_worklet_fn_decl(fn_decl);
+        }
+    }
+
+    // TODO: consolidate with process_if_fn_decl_worklet_node
     fn process_if_worklet_node(&mut self, fn_like_expr: &mut Expr) {
         let mut visitor = DirectiveFinderVisitor::new(self.comments.clone());
         fn_like_expr.visit_mut_children_with(&mut visitor);
@@ -793,6 +802,11 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
         }
     }
 
+    fn process_worklet_fn_decl(&mut self, fn_decl: &mut FnDecl) {
+
+    }
+
+    // TODO: consolidate with process_worklet_fn_decl
     fn process_worklet_function(&mut self, fn_like_expr: &mut Expr) {
         match fn_like_expr {
             Expr::Arrow(arrow_expr) => {
@@ -966,27 +980,12 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> Vis
 
     fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {
         fn_decl.visit_mut_children_with(self);
+
+        self.process_if_fn_decl_worklet_node(fn_decl);
+        /*if self.in_gesture_handler_event_callback {
+            self.process_worklet_function(expr);
+        }*/
     }
-
-    /*
-    fn visit_mut_fn_expr(&mut self, fn_expr: &mut FnExpr) {
-        //processIfWorkletNode(t, path, state);
-        if self.in_gesture_handler_event_callback {
-            self.process_worklet_function(&mut Expr::Fn(fn_expr.take()));
-        }
-
-        fn_expr.visit_mut_children_with(self);
-    } */
-
-    /*
-    fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {
-        if self.in_gesture_handler_event_callback {
-            let mut expr = Expr::Arrow(arrow_expr.take());
-            self.process_worklet_function(&mut expr);
-            println!("{:#?}", expr);
-        }
-        arrow_expr.visit_mut_children_with(self);
-    }*/
 
     fn visit_mut_expr(&mut self, expr: &mut Expr) {
         expr.visit_mut_children_with(self);
