@@ -80,7 +80,43 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
   `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _reactNativeReanimated = _interopRequireWildcard(require(\\"react-native-reanimated\\"));
+
+    function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== \\"function\\") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function _getRequireWildcardCache(nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+
+    function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== \\"object\\" && typeof obj !== \\"function\\") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== \\"default\\" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+    function Box() {
+      var offset = (0, _reactNativeReanimated.useSharedValue)(0);
+      var animatedStyles = (0, _reactNativeReanimated.useAnimatedStyle)(function () {
+        var _f = function _f() {
+          return {
+            transform: [{
+              translateX: offset.value * 255
+            }]
+          };
+        };
+
+        _f._closure = {
+          offset: offset
+        };
+        _f.asString = \\"function _f(){const{offset}=jsThis._closure;{return{transform:[{translateX:offset.value*255}]};}}\\";
+        _f.__workletHash = 7114514849439;
+        _f.__location = \\"${process.cwd()}/jest tests fixture (10:48)\\";
+        _f.__optimalization = 3;
+        return _f;
+      }());
+      return React.createElement(React.Fragment, null, React.createElement(_reactNativeReanimated.default.View, {
+        style: [styles.box, animatedStyles]
+      }), React.createElement(Button, {
+        onPress: function onPress() {
+          return offset.value = Math.random();
+        },
+        title: \\"Move\\"
+      }));
+    }"
+    `);
   });
 
   it.skip("supports default ES6 style imports", () => {
@@ -171,7 +207,20 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f(x) {
+        var bar = 'worklet';
+        var baz = \\"worklet\\";
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(x){const bar='worklet';const baz=\\\\\\"worklet\\\\\\";}\\";
+      _f.__workletHash = 9810417751380;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("captures worklets environment", () => {
@@ -187,7 +236,31 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+      "var x = 5;
+      var objX = {
+        x: x
+      };
+
+      var f = function () {
+        var _f = function _f() {
+          return {
+            res: x + objX.x
+          };
+        };
+
+        _f._closure = {
+          x: x,
+          objX: {
+            x: objX.x
+          }
+        };
+        _f.asString = \\"function f(){const{x,objX}=jsThis._closure;{return{res:x+objX.x};}}\\";
+        _f.__workletHash = 10184269015616;
+        _f.__location = \\"${process.cwd()}/jest tests fixture (6:6)\\";
+        return _f;
+      }();"
+      `);
   });
 
   /*
@@ -212,7 +285,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
       },
     });
     expect(closureBindings).toEqual([]);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+"var f = function () {
+  var _f = function _f() {
+    console.log('test');
+  };
+
+  _f._closure = {};
+  _f.asString = \\"function f(){console.log('test');}\\";
+  _f.__workletHash = 13298016111221;
+  _f.__location = \\"${ process.cwd() }/jest tests fixture (2:6)\\";
+  return _f;
+}();"
+`);
   });*/
 
   // functions
@@ -228,7 +313,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f(x) {
+        return x + 2;
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(x){return x+2;}\\";
+      _f.__workletHash = 4679479961836;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("workletizes ArrowFunctionExpression", () => {
@@ -242,7 +339,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f(x) {
+        return x + 2;
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(x){return x+2;}\\";
+      _f.__workletHash = 11411090164019;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("workletizes unnamed FunctionExpression", () => {
@@ -256,7 +365,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f(x) {
+        return x + 2;
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(x){return x+2;}\\";
+      _f.__workletHash = 11411090164019;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("workletizes named FunctionExpression", () => {
@@ -270,7 +391,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f(x) {
+        return x + 2;
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(x){return x+2;}\\";
+      _f.__workletHash = 4679479961836;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
+      return _f;
+    }();"
+    `);
   });
 
   // class methods
@@ -288,7 +421,35 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
+
+    var _classCallCheck2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/classCallCheck\\"));
+
+    var _createClass2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/createClass\\"));
+
+    var Foo = function () {
+      function Foo() {
+        (0, _classCallCheck2.default)(this, Foo);
+      }
+
+      (0, _createClass2.default)(Foo, [{
+        key: \\"bar\\",
+        value: function () {
+          var _f = function _f(x) {
+            return x + 2;
+          };
+
+          _f._closure = {};
+          _f.asString = \\"function bar(x){return x+2;}\\";
+          _f.__workletHash = 16974800582491;
+          _f.__location = \\"${process.cwd()}/jest tests fixture\\";
+          return _f;
+        }()
+      }]);
+      return Foo;
+    }();"
+    `);
   });
 
   it.skip("workletizes static method", () => {
@@ -304,7 +465,35 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
+
+    var _classCallCheck2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/classCallCheck\\"));
+
+    var _createClass2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/createClass\\"));
+
+    var Foo = function () {
+      function Foo() {
+        (0, _classCallCheck2.default)(this, Foo);
+      }
+
+      (0, _createClass2.default)(Foo, null, [{
+        key: \\"bar\\",
+        value: function () {
+          var _f = function _f(x) {
+            return x + 2;
+          };
+
+          _f._closure = {};
+          _f.asString = \\"function bar(x){return x+2;}\\";
+          _f.__workletHash = 16974800582491;
+          _f.__location = \\"${process.cwd()}/jest tests fixture\\";
+          return _f;
+        }()
+      }]);
+      return Foo;
+    }();"
+    `);
   });
 
   it.skip("workletizes getter", () => {
@@ -320,7 +509,37 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
     expect(code).not.toContain('\\"worklet\\";');
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
+
+    var _classCallCheck2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/classCallCheck\\"));
+
+    var _createClass2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/createClass\\"));
+
+    var Foo = function () {
+      function Foo() {
+        (0, _classCallCheck2.default)(this, Foo);
+      }
+
+      (0, _createClass2.default)(Foo, [{
+        key: \\"bar\\",
+        get: function () {
+          var _f = function _f() {
+            return x + 2;
+          };
+
+          _f._closure = {
+            x: x
+          };
+          _f.asString = \\"function get(){const{x}=jsThis._closure;{return x+2;}}\\";
+          _f.__workletHash = 2468276954688;
+          _f.__location = \\"${process.cwd()}/jest tests fixture\\";
+          return _f;
+        }()
+      }]);
+      return Foo;
+    }();"
+    `);
   });
 
   // function hooks
@@ -334,7 +553,22 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var animatedStyle = useAnimatedStyle(function () {
+      var _f = function _f() {
+        return {
+          width: 50
+        };
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(){return{width:50};}\\";
+      _f.__workletHash = 9756190407413;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:45)\\";
+      _f.__optimalization = 3;
+      return _f;
+    }());"
+    `);
   });
 
   it.skip("workletizes hook wrapped unnamed FunctionExpression automatically", () => {
@@ -348,7 +582,22 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var animatedStyle = useAnimatedStyle(function () {
+      var _f = function _f() {
+        return {
+          width: 50
+        };
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(){return{width:50};}\\";
+      _f.__workletHash = 9756190407413;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:45)\\";
+      _f.__optimalization = 3;
+      return _f;
+    }());"
+    `);
   });
 
   it.skip("workletizes hook wrapped named FunctionExpression automatically", () => {
@@ -362,7 +611,22 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var animatedStyle = useAnimatedStyle(function () {
+      var _f = function _f() {
+        return {
+          width: 50
+        };
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(){return{width:50};}\\";
+      _f.__workletHash = 6275510763626;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:45)\\";
+      _f.__optimalization = 3;
+      return _f;
+    }());"
+    `);
   });
 
   // object hooks
@@ -417,7 +681,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
               _f._closure = {};
               _f.asString = \\"function _f(event){console.log(event);}\\";
               _f.__workletHash = 2164830539996;
-              _f.__location = \\"${ process.cwd() }/jest tests fixture (3:17)\\";
+              _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
               return _f;
           }()
       });
@@ -436,7 +700,21 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "useAnimatedGestureHandler({
+      onStart: function () {
+        var _f = function _f(event) {
+          console.log(event);
+        };
+
+        _f._closure = {};
+        _f.asString = \\"function onStart(event){console.log(event);}\\";
+        _f.__workletHash = 338158776260;
+        _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
+        return _f;
+      }()
+    });"
+    `);
   });
 
   it.skip("workletizes object hook wrapped ObjectMethod automatically", () => {
@@ -450,7 +728,21 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "useAnimatedGestureHandler({
+      onStart: function () {
+        var _f = function _f(event) {
+          console.log(event);
+        };
+
+        _f._closure = {};
+        _f.asString = \\"function onStart(event){console.log(event);}\\";
+        _f.__workletHash = 338158776260;
+        _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
+        return _f;
+      }()
+    });"
+    `);
   });
 
   it("supports empty object in hooks", () => {
@@ -494,7 +786,41 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _reactNativeGestureHandler = require(\\"react-native-gesture-handler\\");
+
+    var foo = _reactNativeGestureHandler.Gesture.Tap().numberOfTaps(2).onBegin(function () {
+      var _f = function _f() {
+        console.log('onBegin');
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(){console.log('onBegin');}\\";
+      _f.__workletHash = 13662490049850;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (6:17)\\";
+      return _f;
+    }()).onStart(function () {
+      var _f = function _f(_event) {
+        console.log('onStart');
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(_event){console.log('onStart');}\\";
+      _f.__workletHash = 16334902412526;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (9:17)\\";
+      return _f;
+    }()).onEnd(function () {
+      var _f = function _f(_event, _success) {
+        console.log('onEnd');
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function _f(_event,_success){console.log('onEnd');}\\";
+      _f.__workletHash = 4053780716017;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (12:15)\\";
+      return _f;
+    }());"
+    `);
   });
 
   it.skip("doesn't transform standard callback functions", () => {
@@ -505,7 +831,11 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = Something.Tap().onEnd(function (_event, _success) {
+      console.log('onEnd');
+    });"
+    `);
   });
 
   it.skip("transforms spread operator in worklets for arrays", () => {
@@ -518,7 +848,20 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f() {
+        var bar = [4, 5];
+        var baz = [1].concat([2, 3], bar);
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(){const bar=[4,5];const baz=[1,...[2,3],...bar];}\\";
+      _f.__workletHash = 3161057533258;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("transforms spread operator in worklets for objects", () => {
@@ -531,7 +874,32 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
+
+    var _extends2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/extends\\"));
+
+    var foo = function () {
+      var _f = function _f() {
+        var bar = {
+          d: 4,
+          e: 5
+        };
+        var baz = (0, _extends2.default)({
+          a: 1
+        }, {
+          b: 2,
+          c: 3
+        }, {}, bar);
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(){const bar={d:4,e:5};const baz={a:1,...{b:2,c:3},...bar};}\\";
+      _f.__workletHash = 792186851025;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("transforms spread operator in worklets for function arguments", () => {
@@ -543,7 +911,23 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var foo = function () {
+      var _f = function _f() {
+        for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+
+        console.log(args);
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(...args){console.log(args);}\\";
+      _f.__workletHash = 9866931756941;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
+    `);
   });
 
   it.skip("transforms spread operator in worklets for function calls", () => {
@@ -555,6 +939,24 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
+
+    var _toConsumableArray2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/toConsumableArray\\"));
+
+    var foo = function () {
+      var _f = function _f(arg) {
+        var _console;
+
+        (_console = console).log.apply(_console, (0, _toConsumableArray2.default)(arg));
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(arg){console.log(...arg);}\\";
+      _f.__workletHash = 2015887751437;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
+    `);
   });
 });
