@@ -1,7 +1,7 @@
 mod constants;
 use std::path::{Path, PathBuf};
 
-use crate::constants::GLOBALS;
+use crate::constants::{GLOBALS, GESTURE_HANDLER_GESTURE_OBJECTS};
 use constants::{
     FUNCTIONLESS_FLAG, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION,
     STATEMENTLESS_FLAG,
@@ -806,7 +806,9 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
     }
 
     fn process_if_gesture_handler_event_callback_function(&mut self, callee: &mut Callee) {
-        if is_gesture_object_event_callback_method(callee) {}
+        if is_gesture_object_event_callback_method(callee) {
+
+        }
         /*if (
           t.isCallExpression(fun.parent) &&
           isGestureObjectEventCallbackMethod(t, fun.parent.callee)
@@ -832,7 +834,7 @@ fn is_gesture_object(expr: &Expr) -> bool {
                 if let Expr::Ident(ident) = &*member_expr.obj {
                     if let MemberProp::Ident(prop_ident) = &member_expr.prop {
                         return &*ident.sym == "Gesture"
-                            && GESTURE_HANDLER_BUILDER_METHODS
+                            && GESTURE_HANDLER_GESTURE_OBJECTS
                                 .iter()
                                 .any(|m| *m == &*prop_ident.sym);
                     }

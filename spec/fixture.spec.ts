@@ -753,7 +753,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     executeTransform(input);
   });
 
-  it.skip("transforms each object property in hooks", () => {
+  it("transforms each object property in hooks", () => {
     const input = `
       useAnimatedGestureHandler({
         onStart: () => {},

@@ -15,6 +15,22 @@ pub static GESTURE_HANDLER_BUILDER_METHODS: [&str; 10] = [
     "onTouchesCancelled",
   ];
 
+pub static GESTURE_HANDLER_GESTURE_OBJECTS: [&str; 12] = [
+    // from https://github.com/software-mansion/react-native-gesture-handler/blob/new-api/src/handlers/gestures/gestureObjects.ts
+    "Tap",
+    "Pan",
+    "Pinch",
+    "Rotation",
+    "Fling",
+    "LongPress",
+    "ForceTouch",
+    "Native",
+    "Manual",
+    "Race",
+    "Simultaneous",
+    "Exclusive",
+  ];
+
 pub static GLOBALS: [&str; 54] = [
     "this",
     "console",
