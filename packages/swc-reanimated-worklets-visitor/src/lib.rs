@@ -3,7 +3,7 @@ use hash32::{FnvHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::hash::Hash;
 
-use crate::constants::{GLOBALS, GESTURE_HANDLER_GESTURE_OBJECTS};
+use crate::constants::{GESTURE_HANDLER_GESTURE_OBJECTS, GLOBALS};
 use constants::{
     FUNCTIONLESS_FLAG, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION,
     STATEMENTLESS_FLAG,
@@ -134,6 +134,7 @@ struct ReanimatedWorkletsVisitor<S: swc_common::SourceMapper> {
     in_use_animated_style: bool,
     source_map: std::sync::Arc<S>,
     relative_cwd: Option<PathBuf>,
+    in_gesture_handler_event_callback: bool,
 }
 
 impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
@@ -149,6 +150,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             filename,
             relative_cwd,
             in_use_animated_style: false,
+            in_gesture_handler_event_callback: false,
         }
     }
 
@@ -792,7 +794,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
 
     fn process_if_gesture_handler_event_callback_function(&mut self, callee: &mut Callee) {
         if is_gesture_object_event_callback_method(callee) {
-
+            //self.process_worklet_function();
         }
         /*if (
           t.isCallExpression(fun.parent) &&
@@ -872,26 +874,52 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
 impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         if is_gesture_object_event_callback_method(&call_expr.callee) {
-            self.process_if_gesture_handler_event_callback_function(&mut call_expr.callee);
+            let old = self.in_gesture_handler_event_callback;
+            self.in_gesture_handler_event_callback =
+                is_gesture_object_event_callback_method(&mut call_expr.callee);
+            call_expr.visit_mut_children_with(self);
+            self.in_gesture_handler_event_callback = old;
         } else {
             self.process_worklets(call_expr);
+            call_expr.visit_mut_children_with(self);
         }
-
-        call_expr.visit_mut_children_with(self);
     }
 
     fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {
         fn_decl.visit_mut_children_with(self);
     }
 
+    /*
     fn visit_mut_fn_expr(&mut self, fn_expr: &mut FnExpr) {
         //processIfWorkletNode(t, path, state);
+        if self.in_gesture_handler_event_callback {
+            self.process_worklet_function(&mut Expr::Fn(fn_expr.take()));
+        }
 
         fn_expr.visit_mut_children_with(self);
-    }
+    } */
 
+    /*
     fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {
+        if self.in_gesture_handler_event_callback {
+            let mut expr = Expr::Arrow(arrow_expr.take());
+            self.process_worklet_function(&mut expr);
+            println!("{:#?}", expr);
+        }
         arrow_expr.visit_mut_children_with(self);
+    }*/
+
+    fn visit_mut_expr(&mut self, expr: &mut Expr) {
+        expr.visit_mut_children_with(self);
+
+        if self.in_gesture_handler_event_callback {
+            match expr {
+                Expr::Arrow(..) | Expr::Fn(..) => {
+                    self.process_worklet_function(expr);
+                }
+                _ => {}
+            }
+        }
     }
 }
 
