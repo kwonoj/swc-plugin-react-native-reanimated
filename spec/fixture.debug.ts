@@ -41,27 +41,30 @@ const transformPresets: Array<
       const { transformSync } = require('@swc/core');
       return transformSync(code, opt)
     }],*/
-    [
-      "custom transform",
-      (code: string) => {
-        const { transformSync } = require("../index");
-        return transformSync(code, true, Buffer.from(JSON.stringify(options)));
-      },
-    ],
-  ];
+  [
+    "custom transform",
+    (code: string) => {
+      const { transformSync } = require("../index");
+      return transformSync(code, true, Buffer.from(JSON.stringify(options)));
+    },
+  ],
+];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
-  it("workletizes object hook wrapped ObjectMethod automatically", () => {
+  it("doesn't transform standard callback functions", () => {
     const input = `
-      useAnimatedGestureHandler({
-        onStart(event) {
-          console.log(event);
-        },
+      const foo = Something.Tap().onEnd((_event, _success) => {
+        console.log('onEnd');
       });
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot();
+    expect(code).toMatchInlineSnapshot(`
+      "\\"use strict\\";
+      const foo = Something.Tap().onEnd((_event, _success)=>{
+          console.log('onEnd');
+      });
+      "
+    `);
   });
 });
