@@ -1,5 +1,7 @@
 mod constants;
+use hash32::{FnvHasher, Hasher};
 use std::path::{Path, PathBuf};
+use std::hash::Hash;
 
 use crate::constants::{GLOBALS, GESTURE_HANDLER_GESTURE_OBJECTS};
 use constants::{
@@ -46,28 +48,11 @@ fn get_callee_expr_ident(expr: &Expr) -> Option<Ident> {
     }
 }
 
-/// Naive port to string-hash-64 original plugin uses
-/// to calculate hash.
-///
-/// TODO: This may not be required. The only reason to port
-/// this fn is trying to mimic original behavior as close.
-/// Confirm if any other hash can be used instead.
+/// This hash does not returns identical to original plugin's hash64.
 fn calculate_hash(value: &str) -> f64 {
-    let mut hash1: i32 = 5381;
-    let mut hash2: i32 = 52711;
-
-    for c in value.chars().rev() {
-        let char_code = c as i32;
-
-        hash1 = (hash1.overflowing_mul(33).0) ^ char_code;
-        hash2 = (hash2.overflowing_mul(33).0) ^ char_code;
-    }
-
-    (hash1 as u64 >> 0)
-        .overflowing_mul(4096)
-        .0
-        .overflowing_add((hash2 as u32 >> 0) as u64)
-        .0 as f64
+    let mut fnv = FnvHasher::default();
+    value.hash(&mut fnv);
+    fnv.finish32() as f64
 }
 
 struct OptimizationFinderVisitor {

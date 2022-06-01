@@ -651,7 +651,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
             };
             _f._closure = {};
             _f.asString = \\"function _f(event){console.log(event);}\\";
-            _f.__workletHash = 2164830539996;
+            _f.__workletHash = 4276664511;
             _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
             return _f;
         }()
@@ -680,7 +680,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
               };
               _f._closure = {};
               _f.asString = \\"function _f(event){console.log(event);}\\";
-              _f.__workletHash = 2164830539996;
+              _f.__workletHash = 4276664511;
               _f.__location = \\"${process.cwd()}/jest tests fixture (3:17)\\";
               return _f;
           }()
