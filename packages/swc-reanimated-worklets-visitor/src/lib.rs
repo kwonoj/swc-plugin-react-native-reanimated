@@ -1,7 +1,7 @@
 mod constants;
 use hash32::{FnvHasher, Hasher};
-use std::path::{Path, PathBuf};
 use std::hash::Hash;
+use std::path::{Path, PathBuf};
 
 use crate::constants::{GESTURE_HANDLER_GESTURE_OBJECTS, GLOBALS};
 use constants::{
@@ -100,6 +100,67 @@ impl Visit for OptimizationFinderVisitor {
     }
 }
 
+struct DirectiveFinderVisitor<C: Clone + swc_common::comments::Comments> {
+    pub has_worklet_directive: bool,
+    in_fn_parent_node: bool,
+    comments: C,
+}
+
+impl<C: Clone + swc_common::comments::Comments> DirectiveFinderVisitor<C> {
+    pub fn new(comments: C) -> Self {
+        DirectiveFinderVisitor {
+            has_worklet_directive: false,
+            in_fn_parent_node: false,
+            comments,
+        }
+    }
+}
+
+impl<C: Clone + swc_common::comments::Comments> VisitMut for DirectiveFinderVisitor<C> {
+    fn visit_mut_expr(&mut self, expr: &mut Expr) {
+        let old = self.in_fn_parent_node;
+        match expr {
+            Expr::Arrow(..) | Expr::Fn(..) => {
+                self.in_fn_parent_node = true;
+            }
+            _ => {}
+        }
+
+        expr.visit_mut_children_with(self);
+        self.in_fn_parent_node = old;
+    }
+
+    fn visit_mut_stmt(&mut self, stmt: &mut Stmt) {
+        // TODO: There's no directive visitor
+        if let Stmt::Expr(ExprStmt { expr, .. }) = stmt {
+            if let Expr::Lit(Lit::Str(Str { value, .. })) = &**expr {
+                if &*value == "worklet" {
+                    self.has_worklet_directive = true;
+                }
+            }
+        }
+
+        if self.has_worklet_directive {
+            // remove comments if there's worklet directive.
+            // TODO:
+            // 1. This is not complete
+            // 2. Do we need utility like .remove_comments_recursively()
+            match &stmt {
+                Stmt::Expr(ExprStmt { span, .. }) | Stmt::Return(ReturnStmt { span, .. }) => {
+                    self.comments.take_leading(span.hi);
+                    self.comments.take_leading(span.lo);
+                    self.comments.take_trailing(span.hi);
+                    self.comments.take_trailing(span.lo);
+                }
+                _ => {}
+            };
+
+            // remove 'worklet'; directive before calling .toString()
+            *stmt = Stmt::dummy();
+        }
+    }
+}
+
 struct ClosureIdentVisitor {}
 
 impl Visit for ClosureIdentVisitor {
@@ -128,21 +189,28 @@ impl Visit for ClosureIdentVisitor {
     fn visit_assign_expr(&mut self, assign_expr: &AssignExpr) {}
 }
 
-struct ReanimatedWorkletsVisitor<S: swc_common::SourceMapper> {
+struct ReanimatedWorkletsVisitor<
+    C: Clone + swc_common::comments::Comments,
+    S: swc_common::SourceMapper,
+> {
     globals: Vec<String>,
     filename: FileName,
     in_use_animated_style: bool,
     source_map: std::sync::Arc<S>,
     relative_cwd: Option<PathBuf>,
     in_gesture_handler_event_callback: bool,
+    comments: C,
 }
 
-impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
+impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
+    ReanimatedWorkletsVisitor<C, S>
+{
     pub fn new(
         source_map: std::sync::Arc<S>,
         globals: Vec<String>,
         filename: FileName,
         relative_cwd: Option<PathBuf>,
+        comments: C,
     ) -> Self {
         ReanimatedWorkletsVisitor {
             source_map,
@@ -151,6 +219,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             relative_cwd,
             in_use_animated_style: false,
             in_gesture_handler_event_callback: false,
+            comments,
         }
     }
 
@@ -688,6 +757,14 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
         )
     }
 
+    fn process_if_worklet_node(&mut self, fn_like_expr: &mut Expr) {
+        let mut visitor = DirectiveFinderVisitor::new(self.comments.clone());
+        fn_like_expr.visit_mut_children_with(&mut visitor);
+        if visitor.has_worklet_directive {
+            self.process_worklet_function(fn_like_expr);
+        }
+    }
+
     fn process_worklet_object_method(&mut self, method_prop: &mut PropOrSpread) {
         let key = if let PropOrSpread::Prop(prop) = method_prop {
             match &**prop {
@@ -871,7 +948,9 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
     return false;
 }
 
-impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
+impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> VisitMut
+    for ReanimatedWorkletsVisitor<C, S>
+{
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         if is_gesture_object_event_callback_method(&call_expr.callee) {
             let old = self.in_gesture_handler_event_callback;
@@ -912,13 +991,14 @@ impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
     fn visit_mut_expr(&mut self, expr: &mut Expr) {
         expr.visit_mut_children_with(self);
 
-        if self.in_gesture_handler_event_callback {
-            match expr {
-                Expr::Arrow(..) | Expr::Fn(..) => {
+        match expr {
+            Expr::Arrow(..) | Expr::Fn(..) => {
+                self.process_if_worklet_node(expr);
+                if self.in_gesture_handler_event_callback {
                     self.process_worklet_function(expr);
                 }
-                _ => {}
             }
+            _ => {}
         }
     }
 }
@@ -943,9 +1023,13 @@ impl WorkletsOptions {
     }
 }
 
-pub fn create_worklets_visitor<S: SourceMapper>(
+pub fn create_worklets_visitor<
+    C: Clone + swc_common::comments::Comments,
+    S: swc_common::SourceMapper,
+>(
     worklets_options: WorkletsOptions,
     source_map: std::sync::Arc<S>,
+    comments: C,
 ) -> impl VisitMut {
     let mut globals_vec = GLOBALS.map(|v| v.to_string()).to_vec();
 
@@ -959,5 +1043,6 @@ pub fn create_worklets_visitor<S: SourceMapper>(
         globals_vec,
         worklets_options.filename,
         worklets_options.relative_cwd,
+        comments,
     )
 }

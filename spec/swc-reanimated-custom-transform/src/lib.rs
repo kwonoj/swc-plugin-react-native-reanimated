@@ -89,10 +89,11 @@ pub fn transform_sync(s: String, _is_module: bool, opts: Buffer) -> napi::Result
                     None,
                     handler,
                     &options,
-                    |_program, _comments| {
+                    |_program, comments| {
                         as_folder(create_worklets_visitor(
                             WorkletsOptions::new(None, filename.clone(), None),
                             c.cm.clone(),
+                            comments.clone(),
                         ))
                     },
                     |_, _| noop(),

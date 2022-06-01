@@ -27,6 +27,7 @@ pub fn process(program: Program, metadata: TransformPluginProgramMetadata) -> Pr
     let visitor = create_worklets_visitor(
         WorkletsOptions::new(None, filename, relative_cwd),
         std::sync::Arc::new(metadata.source_map),
+        metadata.comments,
     );
 
     program.fold_with(&mut as_folder(visitor))
