@@ -70,9 +70,9 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
               return x + 2;
           };
           _f._closure = {};
-          _f.asString = \\"function _f(x){;return x+2;}\\";
+          _f.asString = \\"function foo(x){;return x+2;}\\";
           _f.__workletHash = 3611478349;
-          _f.__location = \\"/home/ojkwon/github_oracle/swc-plugin-react-native-reanimated/jest tests fixture (2:18)\\";
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
           return _f;
       }();
       "

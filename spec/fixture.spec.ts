@@ -302,7 +302,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
   // functions
 
-  it.skip("workletizes FunctionDeclaration", () => {
+  it("workletizes FunctionDeclaration", () => {
     const input = `
       function foo(x) {
         'worklet';
@@ -322,7 +322,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
           };
           _f._closure = {};
           _f.asString = \\"function foo(x){;return x+2;}\\";
-          _f.__workletHash = 3611478349;
+          _f.__workletHash = 3468386974;
           _f.__location = \\"${ process.cwd() }/jest tests fixture (2:6)\\";
           return _f;
       }();
@@ -384,7 +384,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("workletizes named FunctionExpression", () => {
+  it("workletizes named FunctionExpression", () => {
     const input = `
       const foo = function foo(x) {
         'worklet';
@@ -404,7 +404,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
           };
           _f._closure = {};
           _f.asString = \\"function foo(x){;return x+2;}\\";
-          _f.__workletHash = 3611478349;
+          _f.__workletHash = 3468386974;
           _f.__location = \\"${process.cwd()}/jest tests fixture (2:18)\\";
           return _f;
       }();
