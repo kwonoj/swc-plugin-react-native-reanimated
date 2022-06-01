@@ -8,6 +8,7 @@ license = "MIT"
 repository = "https://github.com/kwonoj/swc-plugin-react-native-reanimated"
 
 [dependencies]
+hash32 = "0.3.0"
 swc_common = "0.18.7"
 swc_ecma_codegen = "0.108.6"
 swc_ecma_transforms_compat = "0.101.1"

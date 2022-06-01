@@ -1,7 +1,9 @@
 mod constants;
+use hash32::{FnvHasher, Hasher};
 use std::path::{Path, PathBuf};
+use std::hash::Hash;
 
-use crate::constants::{GLOBALS, GESTURE_HANDLER_GESTURE_OBJECTS};
+use crate::constants::{GESTURE_HANDLER_GESTURE_OBJECTS, GLOBALS};
 use constants::{
     FUNCTIONLESS_FLAG, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION,
     STATEMENTLESS_FLAG,
@@ -46,28 +48,11 @@ fn get_callee_expr_ident(expr: &Expr) -> Option<Ident> {
     }
 }
 
-/// Naive port to string-hash-64 original plugin uses
-/// to calculate hash.
-///
-/// TODO: This may not be required. The only reason to port
-/// this fn is trying to mimic original behavior as close.
-/// Confirm if any other hash can be used instead.
+/// This hash does not returns identical to original plugin's hash64.
 fn calculate_hash(value: &str) -> f64 {
-    let mut hash1: i32 = 5381;
-    let mut hash2: i32 = 52711;
-
-    for c in value.chars().rev() {
-        let char_code = c as i32;
-
-        hash1 = (hash1.overflowing_mul(33).0) ^ char_code;
-        hash2 = (hash2.overflowing_mul(33).0) ^ char_code;
-    }
-
-    (hash1 as u64 >> 0)
-        .overflowing_mul(4096)
-        .0
-        .overflowing_add((hash2 as u32 >> 0) as u64)
-        .0 as f64
+    let mut fnv = FnvHasher::default();
+    value.hash(&mut fnv);
+    fnv.finish32() as f64
 }
 
 struct OptimizationFinderVisitor {
@@ -149,6 +134,7 @@ struct ReanimatedWorkletsVisitor<S: swc_common::SourceMapper> {
     in_use_animated_style: bool,
     source_map: std::sync::Arc<S>,
     relative_cwd: Option<PathBuf>,
+    in_gesture_handler_event_callback: bool,
 }
 
 impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
@@ -164,6 +150,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
             filename,
             relative_cwd,
             in_use_animated_style: false,
+            in_gesture_handler_event_callback: false,
         }
     }
 
@@ -807,7 +794,7 @@ impl<S: swc_common::SourceMapper> ReanimatedWorkletsVisitor<S> {
 
     fn process_if_gesture_handler_event_callback_function(&mut self, callee: &mut Callee) {
         if is_gesture_object_event_callback_method(callee) {
-
+            //self.process_worklet_function();
         }
         /*if (
           t.isCallExpression(fun.parent) &&
@@ -887,26 +874,52 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
 impl<S: SourceMapper> VisitMut for ReanimatedWorkletsVisitor<S> {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         if is_gesture_object_event_callback_method(&call_expr.callee) {
-            self.process_if_gesture_handler_event_callback_function(&mut call_expr.callee);
+            let old = self.in_gesture_handler_event_callback;
+            self.in_gesture_handler_event_callback =
+                is_gesture_object_event_callback_method(&mut call_expr.callee);
+            call_expr.visit_mut_children_with(self);
+            self.in_gesture_handler_event_callback = old;
         } else {
             self.process_worklets(call_expr);
+            call_expr.visit_mut_children_with(self);
         }
-
-        call_expr.visit_mut_children_with(self);
     }
 
     fn visit_mut_fn_decl(&mut self, fn_decl: &mut FnDecl) {
         fn_decl.visit_mut_children_with(self);
     }
 
+    /*
     fn visit_mut_fn_expr(&mut self, fn_expr: &mut FnExpr) {
         //processIfWorkletNode(t, path, state);
+        if self.in_gesture_handler_event_callback {
+            self.process_worklet_function(&mut Expr::Fn(fn_expr.take()));
+        }
 
         fn_expr.visit_mut_children_with(self);
-    }
+    } */
 
+    /*
     fn visit_mut_arrow_expr(&mut self, arrow_expr: &mut ArrowExpr) {
+        if self.in_gesture_handler_event_callback {
+            let mut expr = Expr::Arrow(arrow_expr.take());
+            self.process_worklet_function(&mut expr);
+            println!("{:#?}", expr);
+        }
         arrow_expr.visit_mut_children_with(self);
+    }*/
+
+    fn visit_mut_expr(&mut self, expr: &mut Expr) {
+        expr.visit_mut_children_with(self);
+
+        if self.in_gesture_handler_event_callback {
+            match expr {
+                Expr::Arrow(..) | Expr::Fn(..) => {
+                    self.process_worklet_function(expr);
+                }
+                _ => {}
+            }
+        }
     }
 }
 
