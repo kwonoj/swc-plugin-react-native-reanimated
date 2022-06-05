@@ -842,7 +842,11 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("transforms spread operator in worklets for arrays", () => {
+  // Note: plugin does not do any downlevel transform for the spread.
+  // Core transform should be configured to do transform if needed.
+
+  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
+  it.skip.failing("DOES NOT transforms spread operator in worklets for arrays", () => {
     const input = `
       function foo() {
         'worklet';
@@ -852,23 +856,37 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f() {
-        var bar = [4, 5];
-        var baz = [1].concat([2, 3], bar);
-      };
 
-      _f._closure = {};
-      _f.asString = \\"function foo(){const bar=[4,5];const baz=[1,...[2,3],...bar];}\\";
-      _f.__workletHash = 3161057533258;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
-      return _f;
-    }();"
+    expect(code).toMatchInlineSnapshot(`
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f() {
+              ;
+              const bar = [
+                  4,
+                  5
+              ];
+              const baz = [
+                  1,
+                  ...[
+                      2,
+                      3
+                  ],
+                  ...bar
+              ];
+          };
+          _f._closure = {};
+          _f.asString = \\"function foo(){;const bar=[4,5];const baz=[1,...[2,3],...bar];}\\";
+          _f.__workletHash = 601811320;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
-  it.skip("transforms spread operator in worklets for objects", () => {
+  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
+  it.skip.failing("DOES NOT transforms spread operator in worklets for objects", () => {
     const input = `
       function foo() {
         'worklet';
@@ -879,34 +897,35 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toMatchInlineSnapshot(`
-    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
-
-    var _extends2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/extends\\"));
-
-    var foo = function () {
-      var _f = function _f() {
-        var bar = {
-          d: 4,
-          e: 5
-        };
-        var baz = (0, _extends2.default)({
-          a: 1
-        }, {
-          b: 2,
-          c: 3
-        }, {}, bar);
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function foo(){const bar={d:4,e:5};const baz={a:1,...{b:2,c:3},...bar};}\\";
-      _f.__workletHash = 792186851025;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f() {
+              ;
+              const bar = {
+                  d: 4,
+                  e: 5
+              };
+              const baz = {
+                  a: 1,
+                  ...{
+                      b: 2,
+                      c: 3
+                  },
+                  ...bar
+              };
+          };
+          _f._closure = {};
+          _f.asString = \\"function foo(){;const bar={d:4,e:5};const baz={a:1,...{b:2,c:3},...bar};}\\";
+          _f.__workletHash = 505904037;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
-  it.skip("transforms spread operator in worklets for function arguments", () => {
+  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
+  it.skip.failing("DOES NOT transforms spread operator in worklets for function arguments", () => {
     const input = `
       function foo(...args) {
         'worklet';
@@ -916,25 +935,24 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toMatchInlineSnapshot(`
-    "var foo = function () {
-      var _f = function _f() {
-        for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-          args[_key] = arguments[_key];
-        }
-
-        console.log(args);
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function foo(...args){console.log(args);}\\";
-      _f.__workletHash = 9866931756941;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(...args) {
+              ;
+              console.log(args);
+          };
+          _f._closure = {};
+          _f.asString = \\"function foo(...args){;console.log(args);}\\";
+          _f.__workletHash = 3435132605;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
     `);
   });
 
-  it.skip("transforms spread operator in worklets for function calls", () => {
+  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
+  it.skip.failing("DOES NOT transforms spread operator in worklets for function calls", () => {
     const input = `
       function foo(arg) {
         'worklet';
@@ -944,23 +962,19 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toMatchInlineSnapshot(`
-    "var _interopRequireDefault = require(\\"@babel/runtime/helpers/interopRequireDefault\\");
-
-    var _toConsumableArray2 = _interopRequireDefault(require(\\"@babel/runtime/helpers/toConsumableArray\\"));
-
-    var foo = function () {
-      var _f = function _f(arg) {
-        var _console;
-
-        (_console = console).log.apply(_console, (0, _toConsumableArray2.default)(arg));
-      };
-
-      _f._closure = {};
-      _f.asString = \\"function foo(arg){console.log(...arg);}\\";
-      _f.__workletHash = 2015887751437;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
-      return _f;
-    }();"
+      "\\"use strict\\";
+      const foo = function() {
+          const _f = function _f(arg) {
+              ;
+              console.log(...arg);
+          };
+          _f._closure = {};
+          _f.asString = \\"function foo(arg){;console.log(...arg);}\\";
+          _f.__workletHash = 1527344131;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
     `);
   });
 });
