@@ -2,6 +2,7 @@ mod constants;
 use hash32::{FnvHasher, Hasher};
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
+use swc_common::source_map::SourceMapperExt;
 
 use crate::constants::{GESTURE_HANDLER_GESTURE_OBJECTS, GLOBALS};
 use constants::{
@@ -194,7 +195,7 @@ impl Visit for ClosureIdentVisitor {
 
 struct ReanimatedWorkletsVisitor<
     C: Clone + swc_common::comments::Comments,
-    S: swc_common::SourceMapper,
+    S: swc_common::SourceMapper + swc_common::source_map::SourceMapperExt,
 > {
     globals: Vec<String>,
     filename: FileName,
@@ -205,8 +206,10 @@ struct ReanimatedWorkletsVisitor<
     comments: C,
 }
 
-impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
-    ReanimatedWorkletsVisitor<C, S>
+impl<C, S> ReanimatedWorkletsVisitor<C, S>
+where
+    C: Clone + swc_common::comments::Comments,
+    S: swc_common::SourceMapper + SourceMapperExt,
 {
     pub fn new(
         source_map: std::sync::Arc<S>,
@@ -341,7 +344,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                     ..Default::default()
                 },
                 comments: Default::default(),
-                cm: Default::default(),
+                cm: self.source_map.clone(),
                 wr,
             };
 
@@ -1006,8 +1009,10 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
     return false;
 }
 
-impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> VisitMut
-    for ReanimatedWorkletsVisitor<C, S>
+impl<C, S> VisitMut for ReanimatedWorkletsVisitor<C, S>
+where
+    C: Clone + swc_common::comments::Comments,
+    S: swc_common::SourceMapper + SourceMapperExt,
 {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         if is_gesture_object_event_callback_method(&call_expr.callee) {
@@ -1091,7 +1096,7 @@ impl WorkletsOptions {
 
 pub fn create_worklets_visitor<
     C: Clone + swc_common::comments::Comments,
-    S: swc_common::SourceMapper,
+    S: swc_common::SourceMapper + swc_common::source_map::SourceMapperExt,
 >(
     worklets_options: WorkletsOptions,
     source_map: std::sync::Arc<S>,

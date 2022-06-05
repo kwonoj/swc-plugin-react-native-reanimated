@@ -51,32 +51,31 @@ const transformPresets: Array<
 ];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
-  it("workletizes object hook wrapped ObjectMethod automatically", () => {
+  it("transforms spread operator in worklets for arrays", () => {
     const input = `
-      useAnimatedGestureHandler({
-        onStart(event) {
-          console.log(event);
-        },
-      });
+      function foo() {
+        'worklet';
+        const bar = [4, 5];
+        const baz = [1, ...[2, 3], ...bar];
+      }
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain("_f.__workletHash");
+
+    console.log(code);
     expect(code).toMatchInlineSnapshot(`
-      "\\"use strict\\";
-      useAnimatedGestureHandler({
-          onStart: function() {
-              const _f = function _f(event) {
-                  console.log(event);
-              };
-              _f._closure = {};
-              _f.asString = \\"function onStart(event){console.log(event);}\\";
-              _f.__workletHash = 4276664511;
-              _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
-              return _f;
-          }
-      });
-      "
+    "var foo = function () {
+      var _f = function _f() {
+        var bar = [4, 5];
+        var baz = [1].concat([2, 3], bar);
+      };
+
+      _f._closure = {};
+      _f.asString = \\"function foo(){const bar=[4,5];const baz=[1,...[2,3],...bar];}\\";
+      _f.__workletHash = 3161057533258;
+      _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+      return _f;
+    }();"
     `);
   });
 });

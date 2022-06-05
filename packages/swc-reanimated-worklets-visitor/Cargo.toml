@@ -9,8 +9,8 @@ repository = "https://github.com/kwonoj/swc-plugin-react-native-reanimated"
 
 [dependencies]
 hash32 = "0.3.0"
-swc_common = "0.18.7"
-swc_ecma_codegen = "0.108.6"
-swc_ecma_transforms_compat = "0.101.1"
-swc_ecmascript = { version = "0.159.0", features = ["utils", "visit"] }
-swc_visit = "0.3.0"
+swc_common = { git = "https://github.com/kwonoj/swc", rev = "a7381651eaec89c44b63575b16d5a42d83e02e96", features = ["sourcemap", "concurrent" ] }
+swc_ecma_codegen = { git = "https://github.com/kwonoj/swc", rev = "a7381651eaec89c44b63575b16d5a42d83e02e96" }
+swc_ecma_transforms_compat = { git = "https://github.com/kwonoj/swc", rev = "a7381651eaec89c44b63575b16d5a42d83e02e96" }
+swc_ecmascript = { git = "https://github.com/kwonoj/swc", rev = "a7381651eaec89c44b63575b16d5a42d83e02e96", features = ["utils", "visit"] }
+swc_visit = { git = "https://github.com/kwonoj/swc", rev = "a7381651eaec89c44b63575b16d5a42d83e02e96" }
