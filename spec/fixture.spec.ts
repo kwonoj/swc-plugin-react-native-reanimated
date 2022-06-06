@@ -119,7 +119,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  it.skip("supports default ES6 style imports", () => {
+  it("supports default ES6 style imports", () => {
     const input = `
       import * as Reanimated from 'react-native-reanimated';
 
