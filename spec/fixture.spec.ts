@@ -520,7 +520,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
   // function hooks
 
-  it.skip("workletizes hook wrapped ArrowFunctionExpression automatically", () => {
+  it("workletizes hook wrapped ArrowFunctionExpression automatically", () => {
     const input = `
       const animatedStyle = useAnimatedStyle(() => ({
         width: 50,
@@ -529,21 +529,23 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
 
     const { code } = executeTransform(input);
     expect(code).toContain("_f.__workletHash");
-    expect(code).toMatchInlineSnapshot(`
-    "var animatedStyle = useAnimatedStyle(function () {
-      var _f = function _f() {
-        return {
-          width: 50
-        };
-      };
 
-      _f._closure = {};
-      _f.asString = \\"function _f(){return{width:50};}\\";
-      _f.__workletHash = 9756190407413;
-      _f.__location = \\"${process.cwd()}/jest tests fixture (2:45)\\";
-      _f.__optimalization = 3;
-      return _f;
-    }());"
+    expect(code).toMatchInlineSnapshot(`
+      "\\"use strict\\";
+      const animatedStyle = useAnimatedStyle(function() {
+          const _f = function _f() {
+              return {
+                  width: 50
+              };
+          };
+          _f._closure = {};
+          _f.asString = \\"function _f(){return({width:50});}\\";
+          _f.__workletHash = 3357545625;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:45)\\";
+          _f.__optimalization = 3;
+          return _f;
+      }());
+      "
     `);
   });
 
