@@ -194,7 +194,7 @@ impl Visit for ClosureIdentVisitor {
 
 struct ReanimatedWorkletsVisitor<
     C: Clone + swc_common::comments::Comments,
-    S: swc_common::SourceMapper,
+    S: swc_common::SourceMapper + SourceMapperExt,
 > {
     globals: Vec<String>,
     filename: FileName,
@@ -205,7 +205,7 @@ struct ReanimatedWorkletsVisitor<
     comments: C,
 }
 
-impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
+impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + SourceMapperExt>
     ReanimatedWorkletsVisitor<C, S>
 {
     pub fn new(
@@ -341,7 +341,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper>
                     ..Default::default()
                 },
                 comments: Default::default(),
-                cm: Default::default(),
+                cm: self.source_map.clone(),
                 wr,
             };
 
@@ -1006,7 +1006,7 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
     return false;
 }
 
-impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper> VisitMut
+impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + SourceMapperExt> VisitMut
     for ReanimatedWorkletsVisitor<C, S>
 {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
@@ -1091,7 +1091,7 @@ impl WorkletsOptions {
 
 pub fn create_worklets_visitor<
     C: Clone + swc_common::comments::Comments,
-    S: swc_common::SourceMapper,
+    S: swc_common::SourceMapper + SourceMapperExt,
 >(
     worklets_options: WorkletsOptions,
     source_map: std::sync::Arc<S>,
