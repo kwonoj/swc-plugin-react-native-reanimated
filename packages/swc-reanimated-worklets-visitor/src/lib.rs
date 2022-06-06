@@ -571,14 +571,17 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
         // 1. This may not required
         // 2. If required, need to way to pass config to visitors instead of Default::default()
         // https://github.com/software-mansion/react-native-reanimated/blob/b4ee4ea9a1f246c461dd1819c6f3d48440a25756/plugin.js#L367-L371=
-        let mut preprocessor = chain!(
-            shorthand(),
-            arrow(),
-            optional_chaining(Default::default()),
-            nullish_coalescing(Default::default()),
-            template_literal(Default::default())
-        );
-        cloned.visit_mut_with(&mut preprocessor);
+        let mut preprocessors: Vec<Box<dyn VisitMut>> = vec![
+            Box::new(shorthand()),
+            Box::new(arrow()),
+            Box::new(optional_chaining(Default::default())),
+            Box::new(nullish_coalescing(Default::default())),
+            Box::new(template_literal(Default::default())),
+        ];
+
+        for mut preprocessor in preprocessors.drain(..) {
+            cloned.visit_mut_with(&mut *preprocessor);
+        }
 
         let func_string = self.build_worklet_string(function_name.clone(), cloned);
         let func_hash = calculate_hash(&func_string);
@@ -1085,8 +1088,8 @@ fn is_gesture_object_event_callback_method(callee: &Callee) -> bool {
     return false;
 }
 
-impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + SourceMapperExt> VisitMut
-    for ReanimatedWorkletsVisitor<C, S>
+impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + SourceMapperExt>
+    VisitMut for ReanimatedWorkletsVisitor<C, S>
 {
     fn visit_mut_call_expr(&mut self, call_expr: &mut CallExpr) {
         if is_gesture_object_event_callback_method(&call_expr.callee) {
