@@ -1,4 +1,6 @@
 import * as path from "path";
+import { Visitor } from "@swc/core/Visitor";
+import { AssignmentExpression, Expression, parseSync } from "@swc/core";
 
 const options = {
   filename: path.join(path.resolve(__dirname, ".."), "jest tests fixture"),
@@ -266,8 +268,22 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
       `);
   });
 
-  /*
-  it.skip("doesn't capture globals", () => {
+  it("doesn't capture globals", () => {
+    class GlobalsFinderVisitor extends Visitor {
+      private closureBindings = undefined;
+      public getClosureBindings() {
+        return this.closureBindings;
+      }
+
+      visitAssignmentExpression(n: AssignmentExpression): Expression {
+        if (n.left.property.value === "_closure") {
+          this.closureBindings = n.right.properties;
+        }
+
+        return n;
+      }
+    }
+
     const input = `
       function f() {
         'worklet';
@@ -275,33 +291,34 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
       }
     `;
 
-    const { code, ast } = executeTransform(input, { ast: true });
-    let closureBindings;
-    traverse(ast, {
-      enter(path) {
-        if (
-          path.isAssignmentExpression() &&
-          path.node.left.property.name === '_closure'
-        ) {
-          closureBindings = path.node.right.properties;
-        }
-      },
-    });
-    expect(closureBindings).toEqual([]);
-    expect(code).toMatchInlineSnapshot(`
-"var f = function () {
-  var _f = function _f() {
-    console.log('test');
-  };
+    const { code } = executeTransform(input);
 
-  _f._closure = {};
-  _f.asString = \\"function f(){console.log('test');}\\";
-  _f.__workletHash = 13298016111221;
-  _f.__location = \\"${ process.cwd() }/jest tests fixture (2:6)\\";
-  return _f;
-}();"
-`);
-  });*/
+    const ast = parseSync(code, {
+      syntax: "ecmascript",
+    });
+
+    const visitor = new GlobalsFinderVisitor();
+    visitor.visitProgram(ast);
+    const closureBindings = visitor.getClosureBindings();
+
+    expect(closureBindings).toEqual([]);
+
+    expect(code).toMatchInlineSnapshot(`
+      "\\"use strict\\";
+      const f = function() {
+          const _f = function _f() {
+              ;
+              console.log('test');
+          };
+          _f._closure = {};
+          _f.asString = 'function f(){;console.log(\\"test\\");}';
+          _f.__workletHash = 3585409333;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
+          return _f;
+      }();
+      "
+    `);
+  });
 
   // functions
 
@@ -326,7 +343,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
           _f._closure = {};
           _f.asString = \\"function foo(x){;return x+2;}\\";
           _f.__workletHash = 3468386974;
-          _f.__location = \\"${ process.cwd() }/jest tests fixture (2:6)\\";
+          _f.__location = \\"${process.cwd()}/jest tests fixture (2:6)\\";
           return _f;
       }();
       "
