@@ -1,15 +1,14 @@
 mod constants;
 use hash32::{FnvHasher, Hasher};
 use std::hash::Hash;
-use std::path::{Path, PathBuf};
-use swc_ecmascript::visit::FoldWith;
+use std::path::{PathBuf};
 
 use crate::constants::{GESTURE_HANDLER_GESTURE_OBJECTS, GLOBALS};
 use constants::{
     FUNCTIONLESS_FLAG, FUNCTION_ARGS_TO_WORKLETIZE, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS,
     POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG,
 };
-use swc_common::{util::take::Take, FileName, SourceMapper, Span, DUMMY_SP};
+use swc_common::{util::take::Take, FileName, Span, DUMMY_SP};
 use swc_ecma_codegen::{self, text_writer::WriteJs, Emitter, Node};
 use swc_ecma_transforms_compat::{
     es2015::{arrow, shorthand, template_literal},
@@ -17,8 +16,7 @@ use swc_ecma_transforms_compat::{
 };
 use swc_ecmascript::{
     ast::*,
-    utils::function,
-    visit::{as_folder, Visit, VisitMut, VisitMutWith, VisitWith},
+    visit::{Visit, VisitMut, VisitMutWith, VisitWith},
 };
 use swc_visit::chain;
 
@@ -227,68 +225,9 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
         }
     }
 
-    // Returns a new FunctionExpression which is a workletized version of provided
-    // FunctionDeclaration, FunctionExpression, ArrowFunctionExpression or ObjectMethod.
-    fn make_worklet_method_prop(&mut self, method_prop: &MethodProp) {
-        let fn_name = match &method_prop.key {
-            PropName::Ident(id) => id.clone(),
-            PropName::Str(str) => Ident::new(str.value.clone(), DUMMY_SP),
-            PropName::Num(num) => Ident::new(num.value.to_string().into(), DUMMY_SP),
-            _ => Ident::new("_f".into(), DUMMY_SP),
-        };
-    }
-
-    fn make_worklet_name(&mut self) {
-        todo!("not implemented");
-    }
-
     /// Print givne fn's string with writer.
     /// This should be called with `cloned` node, as internally this'll take ownership.
     fn build_worklet_string(&mut self, fn_name: Ident, expr: Expr) -> String {
-        /*
-        function prependClosureVariablesIfNecessary(closureVariables, body) {
-            if (closureVariables.length === 0) {
-              return body;
-            }
-
-            return t.blockStatement([
-              t.variableDeclaration('const', [
-                t.variableDeclarator(
-                  t.objectPattern(
-                    closureVariables.map((variable) =>
-                      t.objectProperty(
-                        t.identifier(variable.name),
-                        t.identifier(variable.name),
-                        false,
-                        true
-                      )
-                    )
-                  ),
-                  t.memberExpression(t.identifier('jsThis'), t.identifier('_closure'))
-                ),
-              ]),
-              body,
-            ]);
-          }
-
-          traverse(fun, {
-            enter(path) {
-              t.removeComments(path.node);
-            },
-          });
-
-          const workletFunction = t.functionExpression(
-            t.identifier(name),
-            fun.program.body[0].expression.params,
-            prependClosureVariablesIfNecessary(
-              closureVariables,
-              fun.program.body[0].expression.body
-            )
-          );
-
-          return generate(workletFunction, { compact: true }).code;
-         */
-
         let (params, body) = match expr {
             Expr::Arrow(mut arrow_expr) => (
                 arrow_expr.params.drain(..).map(Param::from).collect(),
@@ -338,7 +277,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
 
             let mut emitter = Emitter {
                 cfg: swc_ecma_codegen::Config {
-                    minify: true, //TODO : is this `compact`?
+                    minify: true,
                     ..Default::default()
                 },
                 comments: Default::default(),
@@ -352,149 +291,6 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
                 .expect("Should emit");
         }
         String::from_utf8(buf).expect("invalid utf8 character detected")
-    }
-
-    // Returns a new FunctionExpression which is a workletized version of provided
-    // FunctionDeclaration, FunctionExpression, ArrowFunctionExpression or ObjectMethod.
-    fn make_worklet(&mut self, function: &mut Function) -> Function {
-        // TODO: consolidate into make_worklet_name
-        let dummy_fn_name = Ident::new("_f".into(), DUMMY_SP);
-
-        // TODO
-        /*
-        // remove 'worklet'; directive before calling .toString()
-        fun.traverse({
-            DirectiveLiteral(path) {
-            if (path.node.value === 'worklet' && path.getFunctionParent() === fun) {
-                path.parentPath.remove();
-            }
-            },
-        });
-
-        // We use copy because some of the plugins don't update bindings and
-        // some even break them
-
-        const code =
-            '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
-        */
-
-        // TODO: this mimics existing plugin behavior runs specific transform pass
-        // before running actual visitor.
-        // 1. This may not required
-        // 2. If required, need to way to pass config to visitors instead of Default::default()
-        // https://github.com/software-mansion/react-native-reanimated/blob/b4ee4ea9a1f246c461dd1819c6f3d48440a25756/plugin.js#L367-L371=
-        let mut preprocessor = chain!(
-            shorthand(),
-            arrow(),
-            optional_chaining(Default::default()),
-            nullish_coalescing(Default::default()),
-            template_literal(Default::default())
-        );
-
-        function.visit_mut_with(&mut preprocessor);
-
-        let mut opt_find_visitor = OptimizationFinderVisitor::new();
-        function.visit_with(&mut opt_find_visitor);
-
-        /*
-          const closure = new Map();
-            const outputs = new Set();
-            const closureGenerator = new ClosureGenerator();
-            const options = {};
-        */
-
-        let opt_flags = opt_find_visitor.calculate_flags();
-
-        /*
-         traverse(transformed.ast, {
-            ReferencedIdentifier(path) {
-            const name = path.node.name;
-            if (globals.has(name) || (fun.node.id && fun.node.id.name === name)) {
-                return;
-            }
-
-            const parentNode = path.parent;
-
-            if (
-                parentNode.type === 'MemberExpression' &&
-                parentNode.property === path.node &&
-                !parentNode.computed
-            ) {
-                return;
-            }
-
-            if (
-                parentNode.type === 'ObjectProperty' &&
-                path.parentPath.parent.type === 'ObjectExpression' &&
-                path.node !== parentNode.value
-            ) {
-                return;
-            }
-
-            let currentScope = path.scope;
-
-            while (currentScope != null) {
-                if (currentScope.bindings[name] != null) {
-                return;
-                }
-                currentScope = currentScope.parent;
-            }
-            closure.set(name, path.node);
-            closureGenerator.addPath(name, path);
-            },
-            AssignmentExpression(path) {
-            // test for <something>.value = <something> expressions
-            const left = path.node.left;
-            if (
-                t.isMemberExpression(left) &&
-                t.isIdentifier(left.object) &&
-                t.isIdentifier(left.property, { name: 'value' })
-            ) {
-                outputs.add(left.object.name);
-            }
-            },
-        });
-        */
-
-        let function_expr = if function.body.is_some() {
-        } else {
-        };
-
-        /*
-        const variables = Array.from(closure.values());
-
-        const privateFunctionId = t.identifier('_f');
-        const clone = t.cloneNode(fun.node);
-        let funExpression;
-        if (clone.body.type === 'BlockStatement') {
-            funExpression = t.functionExpression(null, clone.params, clone.body);
-        } else {
-            funExpression = clone;
-        }
-        const funString = buildWorkletString(
-            t,
-            transformed.ast,
-            variables,
-            functionName
-        );
-        const workletHash = hash(funString);
-
-        let location = state.file.opts.filename;
-        if (state.opts.relativeSourceLocation) {
-            const path = require('path');
-            location = path.relative(state.cwd, location);
-        }
-
-        const loc = fun && fun.node && fun.node.loc && fun.node.loc.start;
-        if (loc) {
-            const { line, column } = loc;
-            if (typeof line === 'number' && typeof column === 'number') {
-            location = `${location} (${line}:${column})`;
-            }
-        }
-        */
-
-        Function { ..function.take() }
     }
 
     /// Actual fn to generate AST for worklet-ized function to be called across
@@ -512,40 +308,6 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
         return_type: Option<TsTypeAnn>,
         decorators: Option<Vec<Decorator>>,
     ) -> Function {
-        /*
-        const privateFunctionId = t.identifier('_f');
-        const clone = t.cloneNode(fun.node);
-        let funExpression;
-        if (clone.body.type === 'BlockStatement') {
-            funExpression = t.functionExpression(null, clone.params, clone.body);
-        } else {
-            funExpression = clone;
-        }
-        const funString = buildWorkletString(
-            t,
-            transformed.ast,
-            variables,
-            functionName
-        );
-        const workletHash = hash(funString);
-
-        if (options && options.optFlags) {
-            statements.push(
-            t.expressionStatement(
-                t.assignmentExpression(
-                '=',
-                t.memberExpression(
-                    privateFunctionId,
-                    t.identifier('__optimalization'),
-                    false
-                ),
-                t.numericLiteral(options.optFlags)
-                )
-            )
-            );
-        }
-        */
-
         let function_name = if let Some(ident) = worklet_name {
             ident
         } else {
@@ -561,10 +323,6 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
         } else {
             None
         };
-
-        /*
-         const code = '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
-        */
 
         // TODO: this mimics existing plugin behavior runs specific transform pass
         // before running actual visitor.
@@ -1007,18 +765,6 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
             }
             _ => {}
         }
-    }
-
-    fn process_if_gesture_handler_event_callback_function(&mut self, callee: &mut Callee) {
-        if is_gesture_object_event_callback_method(callee) {
-            //self.process_worklet_function();
-        }
-        /*if (
-          t.isCallExpression(fun.parent) &&
-          isGestureObjectEventCallbackMethod(t, fun.parent.callee)
-        ) {
-          processWorkletFunction(t, fun, state);
-        }*/
     }
 }
 
