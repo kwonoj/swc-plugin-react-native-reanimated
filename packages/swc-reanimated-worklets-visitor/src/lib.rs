@@ -2,11 +2,12 @@ mod constants;
 use hash32::{FnvHasher, Hasher};
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
+use swc_ecmascript::visit::FoldWith;
 
 use crate::constants::{GESTURE_HANDLER_GESTURE_OBJECTS, GLOBALS};
 use constants::{
-    FUNCTIONLESS_FLAG, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS, POSSIBLE_OPT_FUNCTION,
-    STATEMENTLESS_FLAG,
+    FUNCTIONLESS_FLAG, FUNCTION_ARGS_TO_WORKLETIZE, GESTURE_HANDLER_BUILDER_METHODS, OBJECT_HOOKS,
+    POSSIBLE_OPT_FUNCTION, STATEMENTLESS_FLAG,
 };
 use swc_common::{util::take::Take, FileName, SourceMapper, Span, DUMMY_SP};
 use swc_ecma_codegen::{self, text_writer::WriteJs, Emitter, Node};
@@ -552,6 +553,15 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
         };
         let private_fn_name = Ident::new("_f".into(), DUMMY_SP);
 
+        let opt_flags = if self.in_use_animated_style {
+            let mut opt_find_visitor = OptimizationFinderVisitor::new();
+            cloned.visit_with(&mut opt_find_visitor);
+
+            Some(opt_find_visitor.calculate_flags())
+        } else {
+            None
+        };
+
         /*
          const code = '\n(' + (t.isObjectMethod(fun) ? 'function ' : '') + fun.toString() + '\n)';
         */
@@ -573,10 +583,18 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
         let func_string = self.build_worklet_string(function_name.clone(), cloned);
         let func_hash = calculate_hash(&func_string);
 
+        /*
+          const closure = new Map();
+            const outputs = new Set();
+            const closureGenerator = new ClosureGenerator();
+            const options = {};
+        */
+
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
         let as_string_ident = Ident::new("asString".into(), DUMMY_SP);
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
         let location_ident = Ident::new("__location".into(), DUMMY_SP);
+        let optimalization_ident = Ident::new("__optimalization".into(), DUMMY_SP);
 
         // Naive approach to calcuate relative path from options.
         // Note this relies on plugin config option (relative_cwd) to pass specific cwd.
@@ -623,7 +641,37 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
                     return_type,
                 },
             }),
-            BlockStmtOrExpr::Expr(e) => *e,
+            BlockStmtOrExpr::Expr(e) => {
+                // This is based on assumption if fn body is not a blockstmt
+                // we'll manually need to create returnstmt always.
+                // TODO: need to validated further cases.
+
+                let body = if let Expr::Paren(paren) = *e {
+                    *paren.expr
+                } else {
+                    *e
+                };
+
+                Expr::Fn(FnExpr {
+                    ident: Some(private_fn_name.clone()),
+                    function: Function {
+                        params,
+                        decorators,
+                        span: DUMMY_SP,
+                        body: Some(BlockStmt {
+                            stmts: vec![Stmt::Return(ReturnStmt {
+                                span: DUMMY_SP,
+                                arg: Some(Box::new(body)),
+                            })],
+                            ..BlockStmt::dummy()
+                        }),
+                        is_generator,
+                        is_async,
+                        type_params,
+                        return_type,
+                    },
+                })
+            }
         };
 
         let mut stmts = vec![
@@ -704,6 +752,26 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
                 })),
             }),
         ];
+
+        if let Some(opt_flags) = opt_flags {
+            stmts.push(Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(AssignExpr {
+                    span: DUMMY_SP,
+                    op: AssignOp::Assign,
+                    left: PatOrExpr::Expr(Box::new(Expr::Member(MemberExpr {
+                        span: DUMMY_SP,
+                        obj: Box::new(Expr::Ident(private_fn_name.clone())),
+                        prop: MemberProp::Ident(optimalization_ident.clone()),
+                    }))),
+                    right: Box::new(Expr::Lit(Lit::Num(Number {
+                        span: DUMMY_SP,
+                        value: opt_flags.into(),
+                        raw: None,
+                    }))),
+                })),
+            }));
+        }
 
         stmts.push(Stmt::Return(ReturnStmt {
             span: DUMMY_SP,
@@ -882,6 +950,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
     }
 
     fn process_worklets(&mut self, call_expr: &mut CallExpr) {
+        let old = self.in_use_animated_style;
         let name = if let Callee::Expr(expr) = &call_expr.callee {
             get_callee_expr_ident(&*expr)
         } else {
@@ -911,17 +980,27 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
                             };
                         }
                     }
-                } else {
-                    /*
-                    const indexes = functionArgsToWorkletize.get(name);
-                    if (Array.isArray(indexes)) {
-                      indexes.forEach((index) => {
-                        processWorkletFunction(t, path.get(`arguments.${index}`), state);
-                      });
-                    } */
+                }
+                self.in_use_animated_style = false;
+            }
+            Some(name) => {
+                if &*name.sym == "useAnimatedStyle" {
+                    self.in_use_animated_style = true;
                 }
 
-                self.in_use_animated_style = false;
+                let indexes = FUNCTION_ARGS_TO_WORKLETIZE.get(&*name.sym);
+
+                if let Some(indexes) = indexes {
+                    indexes.iter().for_each(|idx| {
+                        let arg = call_expr.args.get_mut(*idx);
+
+                        if let Some(arg) = arg {
+                            self.process_worklet_function(&mut *arg.expr);
+                        }
+                    });
+                }
+
+                self.in_use_animated_style = old;
             }
             _ => {}
         }
