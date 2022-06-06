@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use once_cell::sync::Lazy;
+
 pub static OBJECT_HOOKS: [&str; 2] = ["useAnimatedGestureHandler", "useAnimatedScrollHandler"];
 
 pub static POSSIBLE_OPT_FUNCTION: [&str; 1] = ["interpolate"];
@@ -13,7 +17,7 @@ pub static GESTURE_HANDLER_BUILDER_METHODS: [&str; 10] = [
     "onTouchesMove",
     "onTouchesUp",
     "onTouchesCancelled",
-  ];
+];
 
 pub static GESTURE_HANDLER_GESTURE_OBJECTS: [&str; 12] = [
     // from https://github.com/software-mansion/react-native-gesture-handler/blob/new-api/src/handlers/gestures/gestureObjects.ts
@@ -29,7 +33,7 @@ pub static GESTURE_HANDLER_GESTURE_OBJECTS: [&str; 12] = [
     "Race",
     "Simultaneous",
     "Exclusive",
-  ];
+];
 
 pub static GLOBALS: [&str; 54] = [
     "this",
@@ -87,6 +91,24 @@ pub static GLOBALS: [&str; 54] = [
     "_stopObservingProgress",
     "_startObservingProgress",
 ];
+
+pub static FUNCTION_ARGS_TO_WORKLETIZE: Lazy<HashMap<&'static str, Vec<usize>>> = Lazy::new(|| {
+    HashMap::from([
+        ("useAnimatedStyle", vec![0]),
+        ("useAnimatedProps", vec![0]),
+        ("createAnimatedPropAdapter", vec![0]),
+        ("useDerivedValue", vec![0]),
+        ("useAnimatedScrollHandler", vec![0]),
+        ("useAnimatedReaction", vec![0, 1]),
+        ("useWorkletCallback", vec![0]),
+        ("createWorklet", vec![0]),
+        // animations' callbacks
+        ("withTiming", vec![2]),
+        ("withSpring", vec![2]),
+        ("withDecay", vec![1]),
+        ("withRepeat", vec![3]),
+    ])
+});
 
 pub static FUNCTIONLESS_FLAG: i32 = 0b00000001;
 pub static STATEMENTLESS_FLAG: i32 = 0b00000010;
