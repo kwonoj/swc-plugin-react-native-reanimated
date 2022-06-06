@@ -819,8 +819,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
   // Note: plugin does not do any downlevel transform for the spread.
   // Core transform should be configured to do transform if needed.
 
-  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
-  it.skip.failing("DOES NOT transforms spread operator in worklets for arrays", () => {
+  it("DOES NOT transforms spread operator in worklets for arrays", () => {
     const input = `
       function foo() {
         'worklet';
@@ -859,8 +858,8 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
-  it.skip.failing("DOES NOT transforms spread operator in worklets for objects", () => {
+
+  it("DOES NOT transforms spread operator in worklets for objects", () => {
     const input = `
       function foo() {
         'worklet';
@@ -898,8 +897,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
-  it.skip.failing("DOES NOT transforms spread operator in worklets for function arguments", () => {
+  it("DOES NOT transforms spread operator in worklets for function arguments", () => {
     const input = `
       function foo(...args) {
         'worklet';
@@ -925,8 +923,7 @@ describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
     `);
   });
 
-  // TODO: Reenable after https://github.com/swc-project/swc/pull/4879
-  it.skip.failing("DOES NOT transforms spread operator in worklets for function calls", () => {
+  it("DOES NOT transforms spread operator in worklets for function calls", () => {
     const input = `
       function foo(arg) {
         'worklet';
