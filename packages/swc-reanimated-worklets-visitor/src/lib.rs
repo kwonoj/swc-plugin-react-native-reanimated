@@ -1,8 +1,10 @@
 mod constants;
 use hash32::{FnvHasher, Hasher};
 use indexmap::IndexMap;
+use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::{collections::HashSet, hash::Hash};
 use swc_common::Mark;
 
@@ -165,6 +167,14 @@ impl<C: Clone + swc_common::comments::Comments> VisitMut for DirectiveFinderVisi
     }
 }
 
+struct ClosureGenerator {}
+
+impl ClosureGenerator {
+    pub fn new() -> Self {
+        ClosureGenerator {}
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
     Block,
@@ -196,6 +206,9 @@ pub struct VarInfo {
     pub value: RefCell<Option<Expr>>,
 }
 
+static CLOSURE_VARIABLES: Lazy<Mutex<swc_common::collections::AHashSet<Ident>>> =
+    Lazy::new(|| Mutex::new(Default::default()));
+
 #[derive(Default, Debug)]
 struct Scope<'a> {
     /// Parent scope of the scope
@@ -204,7 +217,6 @@ struct Scope<'a> {
     mark: Mark,
     /// Kind of the scope.
     kind: ScopeKind,
-    closure: swc_common::collections::AHashSet<Id>,
     bindings: IndexMap<Id, VarInfo, ahash::RandomState>,
 }
 
@@ -214,7 +226,6 @@ impl<'a> Scope<'a> {
             parent,
             kind,
             mark,
-            closure: Default::default(),
             bindings: Default::default(),
         }
     }
@@ -229,15 +240,20 @@ struct ClosureIdentVisitor<'a> {
     parent_member_expr_prop_ident: Option<Ident>,
     parent_object_prop_ident: Option<Ident>,
     ident_type: Option<IdentType>,
-    closure: Vec<Ident>,
     scope: Scope<'a>,
     in_type: bool,
     globals: &'a Vec<String>,
     fn_name: &'a Option<Ident>,
+    closure_generator: &'a ClosureGenerator,
 }
 
 impl<'a> ClosureIdentVisitor<'a> {
-    pub fn new(current: Scope<'a>, globals: &'a Vec<String>, fn_name: &'a Option<Ident>) -> Self {
+    pub fn new(
+        current: Scope<'a>,
+        globals: &'a Vec<String>,
+        fn_name: &'a Option<Ident>,
+        closure_generator: &'a ClosureGenerator,
+    ) -> Self {
         ClosureIdentVisitor {
             outputs: Default::default(),
             is_parent_member_expr: false,
@@ -246,12 +262,12 @@ impl<'a> ClosureIdentVisitor<'a> {
             is_in_object_prop: false,
             parent_member_expr_prop_ident: Default::default(),
             parent_object_prop_ident: Default::default(),
-            closure: Default::default(),
             scope: current,
             ident_type: None,
             in_type: false,
             globals,
             fn_name,
+            closure_generator,
         }
     }
 
@@ -264,12 +280,12 @@ impl<'a> ClosureIdentVisitor<'a> {
             is_in_object_prop: value.is_in_object_prop,
             parent_member_expr_prop_ident: value.parent_member_expr_prop_ident.clone(),
             parent_object_prop_ident: value.parent_object_prop_ident.clone(),
-            closure: value.closure.clone(),
             scope: current,
             ident_type: value.ident_type.clone(),
             in_type: false,
             globals: value.globals,
             fn_name: value.fn_name,
+            closure_generator: value.closure_generator,
         }
     }
 
@@ -306,11 +322,8 @@ impl<'a> ClosureIdentVisitor<'a> {
         F: for<'any> FnOnce(&mut ClosureIdentVisitor<'any>),
     {
         let bindings = {
-            let mut child = ClosureIdentVisitor::new(
-                Scope::new(kind, child_mark, Some(&self.scope)),
-                &self.globals,
-                self.fn_name,
-            );
+            let mut child =
+                ClosureIdentVisitor::from(self, Scope::new(kind, child_mark, Some(&self.scope)));
 
             op(&mut child);
 
@@ -778,8 +791,6 @@ impl<'a> Visit for ClosureIdentVisitor<'a> {
 
         if let Some(ident_type) = self.ident_type {
             if ident_type == IdentType::Ref {
-                self.scope.closure.insert(ident.to_id());
-
                 let mut current_scope = Some(&self.scope);
                 while let Some(scope) = current_scope {
                     if scope.bindings.contains_key(&ident.to_id()) {
@@ -789,7 +800,10 @@ impl<'a> Visit for ClosureIdentVisitor<'a> {
                     current_scope = scope.parent;
                 }
 
-                self.closure.push(ident.clone());
+                CLOSURE_VARIABLES
+                    .lock()
+                    .expect("Should unwrap")
+                    .insert(ident.clone());
             }
 
             /*
@@ -863,7 +877,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
 
     /// Print givne fn's string with writer.
     /// This should be called with `cloned` node, as internally this'll take ownership.
-    fn build_worklet_string(&mut self, fn_name: Ident, expr: Expr) -> String {
+    fn build_worklet_string(&mut self, fn_name: Ident, expr: Expr, closure_ident: Ident) -> String {
         let (params, body) = match expr {
             Expr::Arrow(mut arrow_expr) => (
                 arrow_expr.params.drain(..).map(Param::from).collect(),
@@ -881,7 +895,7 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
             _ => todo!("unexpected"),
         };
 
-        let body = match body {
+        let mut body = match body {
             BlockStmtOrExpr::BlockStmt(body) => body,
             BlockStmtOrExpr::Expr(e) => BlockStmt {
                 stmts: vec![Stmt::Expr(ExprStmt {
@@ -890,6 +904,49 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
                 })],
                 ..BlockStmt::dummy()
             },
+        };
+
+        if CLOSURE_VARIABLES.lock().expect("Should unwrap").len() > 0 {
+            let vars = CLOSURE_VARIABLES.lock().expect("Should unwrap");
+            let mut vars = vars.iter().collect::<Vec<_>>();
+
+            // TODO: this is to match snapshot with deterministic visitor results
+            vars.sort_by(|a, b| b.sym.cmp(&a.sym));
+
+            let props = vars
+                .drain(..)
+                .map(|variable| {
+                    ObjectPatProp::Assign(AssignPatProp {
+                        span: DUMMY_SP,
+                        key: variable.clone(),
+                        value: None,
+                    })
+                })
+                .collect();
+
+            let s = Stmt::Decl(Decl::Var(VarDecl {
+                kind: VarDeclKind::Const,
+                decls: vec![VarDeclarator {
+                    name: Pat::Object(ObjectPat {
+                        span: DUMMY_SP,
+                        optional: false,
+                        type_ann: None,
+                        props,
+                    }),
+                    init: Some(Box::new(Expr::Member(MemberExpr {
+                        obj: Box::new(Expr::Ident(Ident::new("jsThis".into(), DUMMY_SP))),
+                        prop: MemberProp::Ident(closure_ident),
+                        ..MemberExpr::dummy()
+                    }))),
+                    ..VarDeclarator::dummy()
+                }],
+                ..VarDecl::dummy()
+            }));
+
+            let old_stmts = body.stmts;
+            let mut new_stmts = vec![s];
+            new_stmts.extend(old_stmts);
+            body.stmts = new_stmts;
         };
 
         let transformed_function = FnExpr {
@@ -977,26 +1034,28 @@ impl<C: Clone + swc_common::comments::Comments, S: swc_common::SourceMapper + So
             cloned.visit_mut_with(&mut *preprocessor);
         }
 
+        let mut closure_generator = ClosureGenerator::new();
         let mut closure_visitor = ClosureIdentVisitor::new(
             Scope::new(ScopeKind::Fn, Mark::new(), None),
             &self.globals,
             &worklet_name,
+            &closure_generator,
         );
         cloned.visit_children_with(&mut closure_visitor);
-
-        let func_string = self.build_worklet_string(function_name.clone(), cloned);
-        let func_hash = calculate_hash(&func_string);
-
-        /*
-            const outputs = new Set();
-            const closureGenerator = new ClosureGenerator();
-        */
 
         let closure_ident = Ident::new("_closure".into(), DUMMY_SP);
         let as_string_ident = Ident::new("asString".into(), DUMMY_SP);
         let worklet_hash_ident = Ident::new("__workletHash".into(), DUMMY_SP);
         let location_ident = Ident::new("__location".into(), DUMMY_SP);
         let optimalization_ident = Ident::new("__optimalization".into(), DUMMY_SP);
+
+        let func_string =
+            self.build_worklet_string(function_name.clone(), cloned, closure_ident.clone());
+        let func_hash = calculate_hash(&func_string);
+
+        /*
+            const closureGenerator = new ClosureGenerator();
+        */
 
         // Naive approach to calcuate relative path from options.
         // Note this relies on plugin config option (relative_cwd) to pass specific cwd.
