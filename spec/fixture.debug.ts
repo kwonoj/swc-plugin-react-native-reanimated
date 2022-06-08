@@ -51,31 +51,43 @@ const transformPresets: Array<
 ];
 
 describe.each(transformPresets)("fixture with %s", (_, executeTransform) => {
-  it("workletizes object hook wrapped ObjectMethod automatically", () => {
+  it("captures worklets environment", () => {
     const input = `
-      useAnimatedGestureHandler({
-        onStart(event) {
-          console.log(event);
-        },
-      });
+    const x = 5;
+
+    const objX = { x };
+
+    function f() {
+      'worklet';
+      return { res: x + objX.x };
+    }
     `;
 
     const { code } = executeTransform(input);
-    expect(code).toContain("_f.__workletHash");
     expect(code).toMatchInlineSnapshot(`
       "\\"use strict\\";
-      useAnimatedGestureHandler({
-          onStart: function() {
-              const _f = function _f(event) {
-                  console.log(event);
+      const x = 5;
+      const objX = {
+          x
+      };
+      const f = function() {
+          const _f = function _f() {
+              ;
+              return {
+                  res: x + objX.x
               };
-              _f._closure = {};
-              _f.asString = \\"function onStart(event){console.log(event);}\\";
-              _f.__workletHash = 4276664511;
-              _f.__location = \\"${process.cwd()}/jest tests fixture (3:8)\\";
-              return _f;
-          }
-      });
+          };
+          _f._closure = {
+              x: x,
+              objX: {
+                  x: objX.x
+              }
+          };
+          _f.asString = \\"function f(){const{x,objX}=jsThis._closure;;{return{res:x+objX.x};}}\\";
+          _f.__workletHash = 1893334613;
+          _f.__location = \\"${process.cwd()}/jest tests fixture (6:6)\\";
+          return _f;
+      }();
       "
     `);
   });
